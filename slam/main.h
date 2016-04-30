@@ -1,0 +1,7 @@
+
+
+enum STATE {
+  INITIALISING,
+  RUNNING,
+  STOPPED
+};
