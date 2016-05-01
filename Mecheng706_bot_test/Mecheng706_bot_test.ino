@@ -5,9 +5,9 @@
 #include "main.h"
 
 const byte left_front = 46;
-const byte left_rear = 47;
-const byte right_rear = 48;
-const byte right_front = 49;
+const byte left_rear = 49;
+const byte right_rear = 47;
+const byte right_front = 48;
 
 Servo left_font_motor;  // create servo object to control a servo
 Servo left_rear_motor;  // create servo object to control a servo
@@ -16,6 +16,7 @@ Servo right_font_motor;  // create servo object to control a servo
 
 int speed_val = 100;
 int speed_change;
+int straight_tol=50;
 //bool go_fw = true;
 
 
@@ -41,15 +42,33 @@ void loop(void) //main loopM
       break;
   };
 
+  //if ((analogRead(A3)) > 50) {
+   // forward();
+    //delay(1000);
+    //forward();
+    while ((analogRead(A1)-analogRead(A2)) > 50) {
+     ccw();
+     
+    }
+    while ((analogRead(A1)-analogRead(A2)) > -50) {
+     cw();
+     
+    }
+    stop();
+    
+//    while ((100*(analogRead(A2)-analogRead(A1)))/(analogRead(A2)+analogRead(A1)) >straight_tol) {
+//     ccw();
+//      Serial.println(100*(analogRead(A2)-analogRead(A1))/(analogRead(A2)+analogRead(A1)));
+//    }
+//    while ((100*(analogRead(A2)-analogRead(A1)))/(analogRead(A2)+analogRead(A1)) >(-1*straight_tol)) {
+//     cw();
+//      Serial.print("o");
+//    }
 
-while ((analogRead(A1)-analogRead(A2)) >50) {
-  ccw();
-}
-while ((analogRead(A1)-analogRead(A2)) <-50) {
-  cw();
-}
-stop();
-
+  /*} else {
+    stop();
+  }
+  */
 }
 
 
@@ -207,6 +226,16 @@ void read_serial_command()
       case '+':
         speed_change = 100;
         Serial.println("+");
+        break;
+      case 't':
+      case 'T':
+        while ((analogRead(A1)-analogRead(A2)) >50) {
+          ccw();
+        }
+        while ((analogRead(A1)-analogRead(A2)) <-50) {
+          cw();
+        }
+        stop();
         break;
       default:
         stop();
