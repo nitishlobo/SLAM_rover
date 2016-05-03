@@ -50,8 +50,18 @@ void loop(void) //main loopM
      ccw();
     }
     stop();*/
+
+    
    go_forward_and_align(analogRead(A2)-analogRead(A1));
 
+    while (analogRead(A3)>300){
+      cw();
+      delay(750);
+      while ((analogRead(A2)-analogRead(A1)) > 50) {
+     cw();//Reverse for normal use
+    }
+    }
+    
     
   /*
   range_diff = analogRead(A1)-analogRead(A2);
