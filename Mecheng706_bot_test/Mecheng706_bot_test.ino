@@ -16,7 +16,8 @@ Servo right_front_motor;  // create servo object to control a servo
 
 int speed_val = 100;
 int speed_change;
-int straight_tol=50;
+int tol_diff = 50;
+int range_diff;
 //bool go_fw = true;
 
 
@@ -41,33 +42,25 @@ void loop(void) //main loopM
       machine_state =  stopped();
       break;
   };
-
-  //if ((analogRead(A3)) > 50) {
-   // forward();
-    //delay(1000);
-    //forward();
-    /*while ((analogRead(A1)-analogRead(A2)) > 50) {
-     ccw();
-     
-    }
-    while ((analogRead(A1)-analogRead(A2)) > -50) {
+  
+    while ((analogRead(A1)-analogRead(A2)) > 50) {
      cw();
-     
+    }
+    while ((analogRead(A2)-analogRead(A1)) > 50) {
+     ccw();
     }
     stop();
-    */
-    //forward();
-//    while ((100*(analogRead(A2)-analogRead(A1)))/(analogRead(A2)+analogRead(A1)) >straight_tol) {
-//     ccw();
-//      Serial.println(100*(analogRead(A2)-analogRead(A1))/(analogRead(A2)+analogRead(A1)));
-//    }
-//    while ((100*(analogRead(A2)-analogRead(A1)))/(analogRead(A2)+analogRead(A1)) >(-1*straight_tol)) {
-//     cw();
-//      Serial.print("o");
-//    }
+   //go_forward_and_align(int speed_adj)
 
-  /*} else {
-    stop();
+    
+  /*
+  range_diff = analogRead(A1)-analogRead(A2);
+  while (abs(range_diff) > tol_diff) {
+    if (range_diff > tol_diff) {
+      ccw();
+    } else if (range_diff < (-1*tol_diff)) {
+      cw();
+    }
   }
   */
 }
@@ -171,9 +164,9 @@ void range_and_speed_settings()
   if (millis() - previous_millis > 500) {  //500ms timed if statement to check lipo and output speed settings
     previous_millis = millis();
     Serial.print("Range1:");
-    Serial.println(analogRead(A1));
+    Serial.println(analogRead(A3));
     Serial.print("Range2:");
-    Serial.println(analogRead(A2));
+    Serial.println(analogRead(A4));
   }
 
 }
@@ -324,11 +317,11 @@ void strafe_right ()
   right_front_motor.writeMicroseconds(1500 + speed_val);
 }
 
-/*
-void go_forward_and_align(speed_adj)
+
+void go_forward_and_align(int speed_adj)
 {  
   left_front_motor.writeMicroseconds(1500 + + speed_val + speed_adj);
   left_rear_motor.writeMicroseconds(1500 + speed_val + speed_adj);
   right_rear_motor.writeMicroseconds(1500 - speed_val - speed_adj);
   right_front_motor.writeMicroseconds(1500 - speed_val - speed_adj);
-}*/
+}
