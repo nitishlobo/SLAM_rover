@@ -41,16 +41,16 @@ void loop(void) //main loopM
     case STOPPED:
       machine_state =  stopped();
       break;
-  };
-  
+  }
+  /*
     while ((analogRead(A1)-analogRead(A2)) > 50) {
      cw();
     }
     while ((analogRead(A2)-analogRead(A1)) > 50) {
      ccw();
     }
-    stop();
-   //go_forward_and_align(int speed_adj)
+    stop();*/
+   go_forward_and_align(analogRead(A2)-analogRead(A1));
 
     
   /*
@@ -322,6 +322,6 @@ void go_forward_and_align(int speed_adj)
 {  
   left_front_motor.writeMicroseconds(1500 + + speed_val + speed_adj);
   left_rear_motor.writeMicroseconds(1500 + speed_val + speed_adj);
-  right_rear_motor.writeMicroseconds(1500 - speed_val - speed_adj);
-  right_front_motor.writeMicroseconds(1500 - speed_val - speed_adj);
+  right_rear_motor.writeMicroseconds(1500 - speed_val + speed_adj);
+  right_front_motor.writeMicroseconds(1500 - speed_val + speed_adj);
 }
