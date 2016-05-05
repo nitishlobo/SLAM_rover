@@ -16,9 +16,11 @@ Servo right_front_motor;  // create servo object to control a servo
 
 int speed_val = 100;
 int speed_change;
-int tol_diff = 50;
+
 int range_diff;
 //bool go_fw = true;
+int sensor_dist;
+float actual_dist;
 
 
 void setup(void)
@@ -51,7 +53,7 @@ void loop(void) //main loopM
     }
     stop();*/
 
-    
+    /*
    go_forward_and_align(analogRead(A2)-analogRead(A1));
 
     while (analogRead(A3)>300){
@@ -61,18 +63,13 @@ void loop(void) //main loopM
      cw();//Reverse for normal use
     }
     }
+    */
     
-    
-  /*
-  range_diff = analogRead(A1)-analogRead(A2);
-  while (abs(range_diff) > tol_diff) {
-    if (range_diff > tol_diff) {
-      ccw();
-    } else if (range_diff < (-1*tol_diff)) {
-      cw();
-    }
-  }
-  */
+  sensor_dist=analogRead(A1);
+  //(analogRead(A2)+analogRead(A1))/2;
+
+  actual_dist=(-0.01*(sensor_dist^3))+(1.0255*(sensor_dist^2))-(37.307*sensor_dist)+616.6;
+
 }
 
 
@@ -174,9 +171,10 @@ void range_and_speed_settings()
   if (millis() - previous_millis > 500) {  //500ms timed if statement to check lipo and output speed settings
     previous_millis = millis();
     Serial.print("Range1:");
-    Serial.println(analogRead(A3));
+    Serial.println(analogRead(A1));
     Serial.print("Range2:");
-    Serial.println(analogRead(A4));
+    Serial.println(analogRead(A2));
+    Serial.println(actual_dist);
   }
 
 }
