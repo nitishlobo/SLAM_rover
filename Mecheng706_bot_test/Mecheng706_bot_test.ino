@@ -20,7 +20,8 @@ int speed_change;
 int range_diff;
 //bool go_fw = true;
 int sensor_dist;
-float actual_dist;
+float actual_dist_lr;
+float actual_dist_sr;
 
 
 void setup(void)
@@ -44,16 +45,7 @@ void loop(void) //main loopM
       machine_state =  stopped();
       break;
   }
-  /*
-    while ((analogRead(A1)-analogRead(A2)) > 50) {
-     cw();
-    }
-    while ((analogRead(A2)-analogRead(A1)) > 50) {
-     ccw();
-    }
-    stop();*/
-
-    /*
+   /*
    go_forward_and_align(analogRead(A2)-analogRead(A1));
 
     while (analogRead(A3)>300){
@@ -64,11 +56,14 @@ void loop(void) //main loopM
     }
     }
     */
-    
-  sensor_dist=analogRead(A1);
-  //(analogRead(A2)+analogRead(A1))/2;
 
-  actual_dist=(-0.01*(sensor_dist^3))+(1.0255*(sensor_dist^2))-(37.307*sensor_dist)+616.6;
+  // Convert long range sensor reading into distance from the wall
+  sensor_dist = analogRead(A1);
+  //sensor_dist = (analogRead(A2)+analogRead(A1))/2;
+  actual_dist_lr = 317756*(pow(sensor_dist,(-1.172)));
+
+  sensor_dist = analogRead(A3);
+  actual_dist_sr = 107698*(pow(sensor_dist,(-1.15)));
 
 }
 
@@ -170,11 +165,16 @@ void range_and_speed_settings()
  
   if (millis() - previous_millis > 500) {  //500ms timed if statement to check lipo and output speed settings
     previous_millis = millis();
-    Serial.print("Range1:");
+    Serial.print("R.L. Range:");
     Serial.println(analogRead(A1));
-    Serial.print("Range2:");
+    Serial.print("F.L. Range:");
     Serial.println(analogRead(A2));
-    Serial.println(actual_dist);
+    Serial.print("F.S. Range:");
+    Serial.println(analogRead(A3));
+    Serial.print("Side distance to wall:");
+    Serial.println(actual_dist_lr);
+    Serial.print("Front distance to wall:");
+    Serial.println(actual_dist_sr);
   }
 
 }
