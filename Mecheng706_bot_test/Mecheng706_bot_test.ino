@@ -14,15 +14,16 @@ Servo left_rear_motor;  // create servo object to control a servo
 Servo right_rear_motor;  // create servo object to control a servo
 Servo right_front_motor;  // create servo object to control a servo
 
+const int robot_width = 210;
+
 int speed_val = 100;
 int speed_change;
 
-int range_diff;
-//bool go_fw = true;
+// Infrared sensor declarations
 int sensor_dist;
 float actual_dist_lr;
 float actual_dist_sr;
-
+int turn_dist = 50;   // Limitation of short range sensor
 
 void setup(void)
 {
@@ -51,20 +52,34 @@ void loop(void) //main loopM
     while (analogRead(A3)>300){
       cw();
       delay(750);
+      //Alignment once turned
       while ((analogRead(A2)-analogRead(A1)) > 50) {
-     cw();//Reverse for normal use
+      cw();//Reverse for normal use
     }
     }
     */
 
-  // Convert long range sensor reading into distance from the wall
+  go_forward_and_align(analogRead(A1)-analogRead(A2));
+  
+  // Convert side long range sensor readings into distance (from the wall)
   sensor_dist = analogRead(A1);
   //sensor_dist = (analogRead(A2)+analogRead(A1))/2;
   actual_dist_lr = 317756*(pow(sensor_dist,(-1.172)));
 
+  // Convert front short range sensor reading into distance (from the wall)
   sensor_dist = analogRead(A3);
   actual_dist_sr = 107698*(pow(sensor_dist,(-1.15)));
 
+  
+  // Turn 90 degrees when close to wall
+  if (actual_dist_sr <= turn_dist) {
+    cw();
+    delay(750);
+    
+    // Increment turning distance from wall
+    turn_dist = turn_dist + robot_width;
+  }
+  
 }
 
 
@@ -88,11 +103,11 @@ STATE running() {
 STATE stopped() {
   static byte counter_lipo_voltage_ok;
   static unsigned long previous_millis;
-  
+
   disable_motors();
   slow_flash_LED_builtin();
-  
-  
+
+
   if (millis() - previous_millis > 500) { //print massage every 500ms
     previous_millis = millis();
     Serial.println("Lipo voltage too LOW, any lower and the lipo with be damaged");
@@ -101,7 +116,7 @@ STATE stopped() {
   //500ms timed if statement to check lipo and output speed settings
   if (!is_battery_voltage__not_OK()) {
     counter_lipo_voltage_ok++;
-    if (counter_lipo_voltage_ok > 20) { //Making sure lipo voltage is stable 
+    if (counter_lipo_voltage_ok > 20) { //Making sure lipo voltage is stable
       counter_lipo_voltage_ok = 0;
       return RUNNING;
     }
@@ -138,7 +153,7 @@ void slow_flash_LED_builtin()
 boolean is_battery_voltage__not_OK()
 {
   static unsigned long previous_millis;
-  
+
   if (millis() - previous_millis > 500) { //500ms timed if statement to check lipo and output speed settings
     previous_millis = millis();
     Serial.print("Lipo level:");
@@ -162,7 +177,7 @@ boolean is_battery_voltage__not_OK()
 void range_and_speed_settings()
 {
   static unsigned long previous_millis;
- 
+
   if (millis() - previous_millis > 500) {  //500ms timed if statement to check lipo and output speed settings
     previous_millis = millis();
     Serial.print("R.L. Range:");
@@ -228,16 +243,6 @@ void read_serial_command()
       case '+':
         speed_change = 100;
         Serial.println("+");
-        break;
-      case 't':
-      case 'T':
-        while ((analogRead(A1)-analogRead(A2)) >50) {
-          ccw();
-        }
-        while ((analogRead(A1)-analogRead(A2)) <-50) {
-          cw();
-        }
-        stop();
         break;
       default:
         stop();
@@ -325,9 +330,8 @@ void strafe_right ()
   right_front_motor.writeMicroseconds(1500 + speed_val);
 }
 
-
 void go_forward_and_align(int speed_adj)
-{  
+{
   left_front_motor.writeMicroseconds(1500 + + speed_val + speed_adj);
   left_rear_motor.writeMicroseconds(1500 + speed_val + speed_adj);
   right_rear_motor.writeMicroseconds(1500 - speed_val + speed_adj);
