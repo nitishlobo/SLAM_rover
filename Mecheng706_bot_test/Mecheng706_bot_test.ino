@@ -5,18 +5,23 @@
 #include "main.h"
 
 const byte left_front = 46;
-const byte left_rear = 47;
-const byte right_rear = 48;
-const byte right_front = 49;
+const byte left_rear = 49;
+const byte right_rear = 47;
+const byte right_front = 48;
 
-Servo left_font_motor;  // create servo object to control a servo
+Servo left_front_motor;  // create servo object to control a servo
 Servo left_rear_motor;  // create servo object to control a servo
 Servo right_rear_motor;  // create servo object to control a servo
-Servo right_font_motor;  // create servo object to control a servo
+Servo right_front_motor;  // create servo object to control a servo
 
 int speed_val = 100;
 int speed_change;
+
+int range_diff;
 //bool go_fw = true;
+int sensor_dist;
+float actual_dist_lr;
+float actual_dist_sr;
 
 
 void setup(void)
@@ -39,16 +44,26 @@ void loop(void) //main loopM
     case STOPPED:
       machine_state =  stopped();
       break;
-  };
+  }
+   /*
+   go_forward_and_align(analogRead(A2)-analogRead(A1));
 
+    while (analogRead(A3)>300){
+      cw();
+      delay(750);
+      while ((analogRead(A2)-analogRead(A1)) > 50) {
+     cw();//Reverse for normal use
+    }
+    }
+    */
 
-while ((analogRead(A1)-analogRead(A2)) >50) {
-  ccw();
-}
-while ((analogRead(A1)-analogRead(A2)) <-50) {
-  cw();
-}
-stop();
+  // Convert long range sensor reading into distance from the wall
+  sensor_dist = analogRead(A1);
+  //sensor_dist = (analogRead(A2)+analogRead(A1))/2;
+  actual_dist_lr = 317756*(pow(sensor_dist,(-1.172)));
+
+  sensor_dist = analogRead(A3);
+  actual_dist_sr = 107698*(pow(sensor_dist,(-1.15)));
 
 }
 
@@ -150,10 +165,16 @@ void range_and_speed_settings()
  
   if (millis() - previous_millis > 500) {  //500ms timed if statement to check lipo and output speed settings
     previous_millis = millis();
-    Serial.print("Range1:");
+    Serial.print("R.L. Range:");
     Serial.println(analogRead(A1));
-    Serial.print("Range2:");
+    Serial.print("F.L. Range:");
     Serial.println(analogRead(A2));
+    Serial.print("F.S. Range:");
+    Serial.println(analogRead(A3));
+    Serial.print("Side distance to wall:");
+    Serial.println(actual_dist_lr);
+    Serial.print("Front distance to wall:");
+    Serial.println(actual_dist_sr);
   }
 
 }
@@ -208,6 +229,16 @@ void read_serial_command()
         speed_change = 100;
         Serial.println("+");
         break;
+      case 't':
+      case 'T':
+        while ((analogRead(A1)-analogRead(A2)) >50) {
+          ccw();
+        }
+        while ((analogRead(A1)-analogRead(A2)) <-50) {
+          cw();
+        }
+        stop();
+        break;
       default:
         stop();
         Serial.println("stop");
@@ -220,10 +251,10 @@ void read_serial_command()
 
 void disable_motors()
 {
-  left_font_motor.detach();  // detach the servo on pin left_front to the servo object
+  left_front_motor.detach();  // detach the servo on pin left_front to the servo object
   left_rear_motor.detach();  // detach the servo on pin left_rear to the servo object
   right_rear_motor.detach();  // detach the servo on pin right_rear to the servo object
-  right_font_motor.detach();  // detach the servo on pin right_front to the servo object
+  right_front_motor.detach();  // detach the servo on pin right_front to the servo object
 
   pinMode(left_front, INPUT);
   pinMode(left_rear, INPUT);
@@ -233,67 +264,72 @@ void disable_motors()
 
 void enable_motors()
 {
-  left_font_motor.attach(left_front);  // attaches the servo on pin left_front to the servo object
+  left_front_motor.attach(left_front);  // attaches the servo on pin left_front to the servo object
   left_rear_motor.attach(left_rear);  // attaches the servo on pin left_rear to the servo object
   right_rear_motor.attach(right_rear);  // attaches the servo on pin right_rear to the servo object
-  right_font_motor.attach(right_front);  // attaches the servo on pin right_front to the servo object
+  right_front_motor.attach(right_front);  // attaches the servo on pin right_front to the servo object
 }
 void stop() //Stop
 {
-  left_font_motor.writeMicroseconds(1500);
+  left_front_motor.writeMicroseconds(1500);
   left_rear_motor.writeMicroseconds(1500);
   right_rear_motor.writeMicroseconds(1500);
-  right_font_motor.writeMicroseconds(1500);
+  right_front_motor.writeMicroseconds(1500);
 }
 
 void forward()
 {
-  left_font_motor.writeMicroseconds(1500 + speed_val);
+  left_front_motor.writeMicroseconds(1500 + speed_val);
   left_rear_motor.writeMicroseconds(1500 + speed_val);
   right_rear_motor.writeMicroseconds(1500 - speed_val);
-  right_font_motor.writeMicroseconds(1500 - speed_val);
+  right_front_motor.writeMicroseconds(1500 - speed_val);
 }
 
 void reverse ()
 {
-  left_font_motor.writeMicroseconds(1500 - speed_val);
+  left_front_motor.writeMicroseconds(1500 - speed_val);
   left_rear_motor.writeMicroseconds(1500 - speed_val);
   right_rear_motor.writeMicroseconds(1500 + speed_val);
-  right_font_motor.writeMicroseconds(1500 + speed_val);
+  right_front_motor.writeMicroseconds(1500 + speed_val);
 }
 
 void ccw ()
 {
-  left_font_motor.writeMicroseconds(1500 - speed_val);
+  left_front_motor.writeMicroseconds(1500 - speed_val);
   left_rear_motor.writeMicroseconds(1500 - speed_val);
   right_rear_motor.writeMicroseconds(1500 - speed_val);
-  right_font_motor.writeMicroseconds(1500 - speed_val);
+  right_front_motor.writeMicroseconds(1500 - speed_val);
 }
 
 void cw ()
 {
-  left_font_motor.writeMicroseconds(1500 + speed_val);
+  left_front_motor.writeMicroseconds(1500 + speed_val);
   left_rear_motor.writeMicroseconds(1500 + speed_val);
   right_rear_motor.writeMicroseconds(1500 + speed_val);
-  right_font_motor.writeMicroseconds(1500 + speed_val);
+  right_front_motor.writeMicroseconds(1500 + speed_val);
 }
 
 void strafe_left ()
 {
-  left_font_motor.writeMicroseconds(1500 - speed_val);
+  left_front_motor.writeMicroseconds(1500 - speed_val);
   left_rear_motor.writeMicroseconds(1500 + speed_val);
   right_rear_motor.writeMicroseconds(1500 + speed_val);
-  right_font_motor.writeMicroseconds(1500 - speed_val);
+  right_front_motor.writeMicroseconds(1500 - speed_val);
 }
 
 void strafe_right ()
 {
-  left_font_motor.writeMicroseconds(1500 + speed_val);
+  left_front_motor.writeMicroseconds(1500 + speed_val);
   left_rear_motor.writeMicroseconds(1500 - speed_val);
   right_rear_motor.writeMicroseconds(1500 - speed_val);
-  right_font_motor.writeMicroseconds(1500 + speed_val);
+  right_front_motor.writeMicroseconds(1500 + speed_val);
 }
 
 
-
-
+void go_forward_and_align(int speed_adj)
+{  
+  left_front_motor.writeMicroseconds(1500 + + speed_val + speed_adj);
+  left_rear_motor.writeMicroseconds(1500 + speed_val + speed_adj);
+  right_rear_motor.writeMicroseconds(1500 - speed_val + speed_adj);
+  right_front_motor.writeMicroseconds(1500 - speed_val + speed_adj);
+}
