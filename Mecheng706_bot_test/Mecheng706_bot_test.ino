@@ -49,6 +49,9 @@ void loop(void) //main loopM
       machine_state =  stopped();
       break;
   }
+   
+     // go_forward_and_align(analogRead(A2)-analogRead(A1));
+
    /*
    go_forward_and_align(analogRead(A2)-analogRead(A1));
 
@@ -62,11 +65,21 @@ void loop(void) //main loopM
     }
     */
 
-  go_forward_and_align(analogRead(A1)-analogRead(A2));
+  //go_forward_and_align(analogRead(A1)-analogRead(A2));
+  Serial.print("Front sensor: ");
+  Serial.println(analogRead(A1));
+  //Serial.print(
+  Serial.print("Back sensor: ");
+  Serial.println(analogRead(A2));
+  Serial.print("Difference between sensors: ");
+  Serial.println(analogRead(A1)-analogRead(A2));
+  Serial.println("");
+  //delay(2000);
+  /*
 
   // Convert side long range sensor readings into distance (from the wall)
-  sensor_dist = analogRead(A1);
-  //sensor_dist = (analogRead(A2)+analogRead(A1))/2;
+  //sensor_dist = analogRead(A1);
+  sensor_dist = (analogRead(A2) + analogRead(A1)) / 2;
   actual_dist_lr = 317756*(pow(sensor_dist,(-1.172)));
 
   // Convert front short range sensor reading into distance (from the wall)
@@ -74,13 +87,13 @@ void loop(void) //main loopM
   actual_dist_sr = 107698*(pow(sensor_dist,(-1.15)));
   Serial.print("FRONT DISTANCE:");
   Serial.println(actual_dist_sr);
-  
+
   Serial.println(analogRead(A2));
   Serial.println(analogRead(A1));
-  
+
 
  // Serial.println("ENTERING TURN LOOP");
-  
+
   // Turn 90 degrees when close to wall
   if (actual_dist_sr <= turn_dist) {
     // Turn until front sensor is able to see next wall.
@@ -92,7 +105,7 @@ void loop(void) //main loopM
     // Align to new wall
     while (analogRead(A2) - analogRead(A1) > 50) {
       Serial.println("Turn CCW");
-     ccw();
+      ccw();
     }
 
     if (turn == 4) {
@@ -103,6 +116,18 @@ void loop(void) //main loopM
       turn = 1;
     }
   }
+
+  Serial.print("R.L. Range:");
+  Serial.println(analogRead(A1));
+  Serial.print("F.L. Range:");
+  Serial.println(analogRead(A2));
+  Serial.print("F.S. Range:");
+  Serial.println(analogRead(A3));
+  Serial.print("Side distance to wall:");
+  Serial.println(actual_dist_lr);
+  Serial.print("Front distance to wall:");
+  Serial.println(actual_dist_sr);
+  */
 
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -204,16 +229,6 @@ void range_and_speed_settings()
 
   if (millis() - previous_millis > 500) {  //500ms timed if statement to check lipo and output speed settings
     previous_millis = millis();
-    Serial.print("R.L. Range:");
-    Serial.println(analogRead(A1));
-    Serial.print("F.L. Range:");
-    Serial.println(analogRead(A2));
-    Serial.print("F.S. Range:");
-    Serial.println(analogRead(A3));
-    Serial.print("Side distance to wall:");
-    Serial.println(actual_dist_lr);
-    Serial.print("Front distance to wall:");
-    Serial.println(actual_dist_sr);
   }
 
 }
@@ -356,7 +371,7 @@ void strafe_right ()
 
 void go_forward_and_align(int speed_adj)
 {
-  left_front_motor.writeMicroseconds(1500 + + speed_val + speed_adj);
+  left_front_motor.writeMicroseconds(1500 + speed_val + speed_adj);
   left_rear_motor.writeMicroseconds(1500 + speed_val + speed_adj);
   right_rear_motor.writeMicroseconds(1500 - speed_val + speed_adj);
   right_front_motor.writeMicroseconds(1500 - speed_val + speed_adj);
@@ -374,13 +389,10 @@ void align(void)
 float front_sensor_mm(){
   int sensor_dist;
   float actual_dist_sr;
-  
+
   sensor_dist = analogRead(A3);
   actual_dist_sr = 107698*(pow(sensor_dist,(-1.15)));
 
   return actual_dist_sr;
 
 }
-
-
-
