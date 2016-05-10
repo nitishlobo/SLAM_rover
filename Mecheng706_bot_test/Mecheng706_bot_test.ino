@@ -23,13 +23,16 @@ int speed_change;
 int sensor_dist;
 float actual_dist_lr;
 float actual_dist_sr;
-int turn_dist = 50;   // Limitation of short range sensor
+// Limitation of short range sensor is 50mm
+int turn_dist = 100;
+int turn = 1;
 
 void setup(void)
 {
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(115200);  //Open serial comms to bluetooth module
 }
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void loop(void) //main loopM
 {
@@ -60,7 +63,7 @@ void loop(void) //main loopM
     */
 
   go_forward_and_align(analogRead(A1)-analogRead(A2));
-  
+
   // Convert side long range sensor readings into distance (from the wall)
   sensor_dist = analogRead(A1);
   //sensor_dist = (analogRead(A2)+analogRead(A1))/2;
@@ -69,19 +72,40 @@ void loop(void) //main loopM
   // Convert front short range sensor reading into distance (from the wall)
   sensor_dist = analogRead(A3);
   actual_dist_sr = 107698*(pow(sensor_dist,(-1.15)));
+  Serial.print("FRONT DISTANCE:");
+  Serial.println(actual_dist_sr);
+  
+  Serial.println(analogRead(A2));
+  Serial.println(analogRead(A1));
+  
 
+ // Serial.println("ENTERING TURN LOOP");
   
   // Turn 90 degrees when close to wall
   if (actual_dist_sr <= turn_dist) {
-    cw();
+    // Turn until front sensor is able to see next wall.
+   ccw();
     delay(750);
-    
-    // Increment turning distance from wall
-    turn_dist = turn_dist + robot_width;
-  }
-  
-}
+    // Record new turn
+    turn = turn + 1;
 
+    // Align to new wall
+    while (analogRead(A2) - analogRead(A1) > 50) {
+      Serial.println("Turn CCW");
+     ccw();
+    }
+
+    if (turn == 4) {
+      // Increment turning distance from wall every fourth turn
+      turn_dist = turn_dist + robot_width;
+
+      // Reset to first turn
+      turn = 1;
+    }
+  }
+
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 STATE initialising() {
   //Do some initialising
@@ -337,3 +361,26 @@ void go_forward_and_align(int speed_adj)
   right_rear_motor.writeMicroseconds(1500 - speed_val + speed_adj);
   right_front_motor.writeMicroseconds(1500 - speed_val + speed_adj);
 }
+
+void align(void)
+{
+  //Use for aligning when close to wall, turns ccw
+   while (analogRead(A2) - analogRead(A1) > 50) {
+      //Serial.println("Turn CCW");
+     ccw();
+    }
+}
+
+float front_sensor_mm(){
+  int sensor_dist;
+  float actual_dist_sr;
+  
+  sensor_dist = analogRead(A3);
+  actual_dist_sr = 107698*(pow(sensor_dist,(-1.15)));
+
+  return actual_dist_sr;
+
+}
+
+
+
