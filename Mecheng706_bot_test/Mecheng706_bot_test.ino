@@ -49,13 +49,13 @@ void loop(void) //main loopM
       break;
   }
 
-   //go_forward_and_align(analogRead(A1)-analogRead(A2));
+   go_forward_and_align();
    //side_dist = get_side_distances();
    //Serial.println(*(side_dist));
    //Serial.println(*(side_dist+1));
    //Serial.println("");
 
-   align();
+   //align();
 /*
     while (analogRead(A3)>300){
       cw();
@@ -79,11 +79,16 @@ void loop(void) //main loopM
 
 /*----------------------------------------------------------------*/
 
-void go_forward_and_align(int speed_adj)
+void go_forward_and_align()
 {
-
+  // Variable declarations
+  int* side_dist;
+  side_dist = get_side_distances();
+  //Speed_adj is gain needed to turn motor back on course. 
+  int speed_adj=2*((*(side_dist+1)) - (*(side_dist )));
   
-  left_front_motor.writeMicroseconds(1500 + + speed_val + speed_adj);
+  
+  left_front_motor.writeMicroseconds(1500 + speed_val + speed_adj);
   left_rear_motor.writeMicroseconds(1500 + speed_val + speed_adj);
   right_rear_motor.writeMicroseconds(1500 - speed_val + speed_adj);
   right_front_motor.writeMicroseconds(1500 - speed_val + speed_adj);
