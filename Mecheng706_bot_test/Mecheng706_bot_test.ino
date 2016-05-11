@@ -45,9 +45,9 @@ void loop(void) //main loopM
       machine_state =  stopped();
       break;
   }
-   /*
-   go_forward_and_align(analogRead(A2)-analogRead(A1));
-
+   
+   go_forward_and_align(analogRead(A1)-analogRead(A2));
+/*
     while (analogRead(A3)>300){
       cw();
       delay(750);
@@ -57,6 +57,7 @@ void loop(void) //main loopM
     }
     */
 
+/*
   // Convert long range sensor reading into distance from the wall
   sensor_dist = analogRead(A1);
   //sensor_dist = (analogRead(A2)+analogRead(A1))/2;
@@ -64,7 +65,7 @@ void loop(void) //main loopM
 
   sensor_dist = analogRead(A3);
   actual_dist_sr = 107698*(pow(sensor_dist,(-1.15)));
-
+*/
 }
 
 
@@ -228,16 +229,6 @@ void read_serial_command()
       case '+':
         speed_change = 100;
         Serial.println("+");
-        break;
-      case 't':
-      case 'T':
-        while ((analogRead(A1)-analogRead(A2)) >50) {
-          ccw();
-        }
-        while ((analogRead(A1)-analogRead(A2)) <-50) {
-          cw();
-        }
-        stop();
         break;
       default:
         stop();
