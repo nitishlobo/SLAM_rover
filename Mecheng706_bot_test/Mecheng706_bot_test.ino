@@ -50,12 +50,12 @@ void loop(void) //main loopM
   }
 
    //go_forward_and_align(analogRead(A1)-analogRead(A2));
-   side_dist = get_side_distances();
-   Serial.println(*(side_dist));
-   Serial.println(*(side_dist+1));
-   Serial.println("");
+   //side_dist = get_side_distances();
+   //Serial.println(*(side_dist));
+   //Serial.println(*(side_dist+1));
+   //Serial.println("");
 
-   //align();
+   align();
 /*
     while (analogRead(A3)>300){
       cw();
@@ -81,6 +81,8 @@ void loop(void) //main loopM
 
 void go_forward_and_align(int speed_adj)
 {
+
+  
   left_front_motor.writeMicroseconds(1500 + + speed_val + speed_adj);
   left_rear_motor.writeMicroseconds(1500 + speed_val + speed_adj);
   right_rear_motor.writeMicroseconds(1500 - speed_val + speed_adj);
@@ -97,10 +99,24 @@ int* get_side_distances() {
 
 void align(void)
 {
-  //Use for aligning when close to wall, turns ccw
-  while (analogRead(A2) - analogRead(A1) > 50) {
-    //Serial.println("Turn CCW");
+  // Variable declarations
+  int* side_dist;
+  side_dist = get_side_distances();
+ 
+  
+  // Front side sensor reading is greater than rear side sensor. Thus turn ccw.
+  while (( *(side_dist) - *(side_dist+1)) > 15) {
     ccw();
+    // Update side sensor readings.
+    side_dist = get_side_distances();
+  }
+  stop();
+
+   // Front side sensor reading is less than rear side sensor. Thus turn cw.
+  while (( *(side_dist) - *(side_dist+1)) < 0) {
+    cw();
+    // Update side sensor readings.
+    side_dist = get_side_distances();
   }
   stop();
 }
