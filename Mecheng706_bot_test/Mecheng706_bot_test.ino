@@ -41,10 +41,23 @@ void loop(void) //main loopM
     case RUNNING:
       machine_state =  running();
       break;
+    case STARTUP:
+      machine_state =  startup();
+      break;
+    case WALL_FOLLOW:
+      machine_state =  wall_follow();
+      break;
+    case CORNER:
+      machine_state =  corner();
+      break;
+    case OBSTACLE:
+      machine_state =  obstacle();
+      break;
     case STOPPED:
       machine_state =  stopped();
       break;
   }
+
    /*
    go_forward_and_align(analogRead(A2)-analogRead(A1));
 
@@ -85,14 +98,44 @@ STATE running() {
   return RUNNING;
 }
 
+STATE startup() {
+  read_serial_command();
+  fast_flash_double_LED_builtin();
+  range_and_speed_settings();
+  if (is_battery_voltage__not_OK()) return STOPPED;
+  return STARTUP;
+}
+STATE wall_follow() {
+  read_serial_command();
+  fast_flash_double_LED_builtin();
+  range_and_speed_settings();
+  if (is_battery_voltage__not_OK()) return STOPPED;
+  return WALL_FOLLOW;
+}
+STATE corner() {
+  read_serial_command();
+  fast_flash_double_LED_builtin();
+  range_and_speed_settings();
+  if (is_battery_voltage__not_OK()) return STOPPED;
+  return CORNER;
+}
+
+STATE obstacle() {
+  read_serial_command();
+  fast_flash_double_LED_builtin();
+  range_and_speed_settings();
+  if (is_battery_voltage__not_OK()) return STOPPED;
+  return OBSTACLE;
+}
+
 STATE stopped() {
   static byte counter_lipo_voltage_ok;
   static unsigned long previous_millis;
-  
+
   disable_motors();
   slow_flash_LED_builtin();
-  
-  
+
+
   if (millis() - previous_millis > 500) { //print massage every 500ms
     previous_millis = millis();
     Serial.println("Lipo voltage too LOW, any lower and the lipo with be damaged");
@@ -101,7 +144,7 @@ STATE stopped() {
   //500ms timed if statement to check lipo and output speed settings
   if (!is_battery_voltage__not_OK()) {
     counter_lipo_voltage_ok++;
-    if (counter_lipo_voltage_ok > 20) { //Making sure lipo voltage is stable 
+    if (counter_lipo_voltage_ok > 20) { //Making sure lipo voltage is stable
       counter_lipo_voltage_ok = 0;
       return RUNNING;
     }
@@ -138,7 +181,7 @@ void slow_flash_LED_builtin()
 boolean is_battery_voltage__not_OK()
 {
   static unsigned long previous_millis;
-  
+
   if (millis() - previous_millis > 500) { //500ms timed if statement to check lipo and output speed settings
     previous_millis = millis();
     Serial.print("Lipo level:");
@@ -162,7 +205,7 @@ boolean is_battery_voltage__not_OK()
 void range_and_speed_settings()
 {
   static unsigned long previous_millis;
- 
+
   if (millis() - previous_millis > 500) {  //500ms timed if statement to check lipo and output speed settings
     previous_millis = millis();
     Serial.print("R.L. Range:");
@@ -327,7 +370,7 @@ void strafe_right ()
 
 
 void go_forward_and_align(int speed_adj)
-{  
+{
   left_front_motor.writeMicroseconds(1500 + + speed_val + speed_adj);
   left_rear_motor.writeMicroseconds(1500 + speed_val + speed_adj);
   right_rear_motor.writeMicroseconds(1500 - speed_val + speed_adj);
