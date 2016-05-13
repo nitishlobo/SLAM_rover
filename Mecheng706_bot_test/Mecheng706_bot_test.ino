@@ -171,6 +171,8 @@ STATE corner() {
   range_and_speed_settings();
 
   ccw();
+  delay(3000);
+  stop();
   delay(750);
   align();
 
