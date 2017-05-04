@@ -1,0 +1,10 @@
+1=initialising
+2=test
+3=running
+4=startup
+5=wall_follow
+6=corner
+7=begin_obstacle_strafe
+8=obstacle
+9=end_obstacle_strafe
+10=stopped
