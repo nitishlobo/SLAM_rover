@@ -5,6 +5,7 @@ Note: Finish all TODO's before merging into master.
 #include <Servo.h>
 #include "state_definitions.h"
 
+#define RUN_TEST_STATE_ONLY 0
 #define ITERATION_SIZE 5
 // Set maximum distance (mm) at which obstacle is detected.
 #define OB_LIMIT 255
@@ -46,19 +47,11 @@ bool strafed_past_ob = false;
 int ob_counter = 0;
 int forward_counter = 0;
 
-
-
 // Set servo motors to a small initial angle of 200 microseconds
 // Ie. 72 degrees since 1000 ms is 360 degrees.
 int speed = 200;
 // Dynamic speed change of servos depending on input from serial command.
 int speed_change;
-
-
-bool first_loop = false;
-
-//Set a flag to do testing in testing state
-bool test_enable=false;
 
 
 
@@ -119,7 +112,6 @@ void loop(void) //main loopM
         direction = 0;
         //Has finished the first loop
         ir_calibration=0.1;
-        first_loop=false;
       }
 
       break;
@@ -434,51 +426,19 @@ STATE initialising() {
   //Serial1.println("Enabling Motors...");
   enable_motors();
   enable_servo();
-  if (test_enable) return TEST;
-  return STARTUP;
+
+  if (RUN_TEST_STATE_ONLY)
+    return TEST;
+  else:
+    return STARTUP;
 }
 
 STATE test() {
   read_Serial11_command();
   fast_flash_double_LED_builtin();
   range_and_speed_settings();
-  /*--------------------------------------------------------------*/
 
-  //is_ob_in_front();
-
-  /*-----------------------------------------------------------------*/
-  /*
-  if(is_obstacle_present())
-  {
-    strafe_right();
-  } else{
-    stop();
-  //  strafe_left();
-  }*/
-
-  int max_front_d=d_front_left;
-  //int front_dist = get_avg_front_distance();
-  //Make front dist the maximum front D
-
-  if(d_front_middle>max_front_d)
-  {
-    max_front_d=d_front_middle;
-  }
-
-  if(d_front_right>max_front_d)
-  {
-    max_front_d=d_front_right;
-  }
-
-  Serial1.println("Left = ");
-  Serial1.print(d_front_left);
-  Serial1.print("Mid = ");
-  Serial1.print(d_front_middle);
-  Serial1.print("Right = ");
-  Serial1.print(d_front_right);
-  Serial1.print("Max = ");
-  Serial1.print(max_front_d);
-
+  // Add any code here to test it out.
   return TEST;
 }
 
