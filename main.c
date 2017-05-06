@@ -2,7 +2,7 @@
 
 Note: Finish all TODO's before merging into master.
 */
-#include <Servo.h>
+//#include <Servo.h>
 #include "state_definitions.h"
 
 #define RUN_TEST_STATE_ONLY 0
@@ -53,25 +53,20 @@ int speed = 200;
 // Dynamic speed change of servos depending on input from serial command.
 int speed_change;
 
-
-
-static float posChanges[3];
-
-
 void setup(void)
 {
   pinMode(LED_BUILTIN, OUTPUT);
-
-  Serial1.begin(115200);  //Open Serial1 comms to bluetooth module
-
-  //Serial1.println("Time HD FL SNR FR SF SB STATE");
+  // Open Serial1 comms to bluetooth module
+  Serial1.begin(115200);
   //Starts up I2C bus for reading from MPU
- MPU_setup();
+  MPU_setup();
 }
 
-void loop(void) //main loopM
+void loop(void)
 {
   static STATE machine_state = INITIALISING;
+
+  // Output
   if (machine_state != INITIALISING ) {
     update_and_output();
   }
@@ -135,29 +130,30 @@ void loop(void) //main loopM
       machine_state = back();
       Serial1.println("12");
   }
-
-
-
-  /*----------------------------------------*/
 }
 
-void update_and_output(){
-  // Variable declarations
-  int* side_dist;
-  int* front_ir_dist;
-  int* sonar_d;
-  float heading;
-  //Distance away from the wall
-  side_dist = get_side_distances();
-  front_ir_dist = get_front_ir_distances();
-  d_front_left = *(front_ir_dist);
-  d_front_right = *(front_ir_dist+1);
-  d_front_middle = get_sonar_distance();
-  heading = Read_MPU();
+/*----------------------------------------*/
 
+/* Update all sensors (side and front IR sensors, ultrasonic sensor and MPU)
+ * and send to serial. */
+void update_and_output() {
+  int* d_side_ir_sensors;
+  int* d_front_ir_sensors;
+  int* d_sonar;
+  float heading_angle;
+
+  // Distances from walls and obstacles.
+  d_side_ir_sensors = get_side_distances();
+  d_front_ir_sensors = get_front_ir_distances();
+  d_front_left = *(d_front_ir_sensors);
+  d_front_right = *(d_front_ir_sensors + 1);
+  d_front_middle = get_sonar_distance();
+  heading_angle = Read_MPU();
+
+  // No value identifiers required for serial printing.
   Serial1.print(millis());
   Serial1.print(" ");
-  Serial1.print(heading);
+  Serial1.print(heading_angle);
   Serial1.print(" ");
   Serial1.print(d_front_left);
   Serial1.print(" ");
@@ -165,62 +161,62 @@ void update_and_output(){
   Serial1.print(" ");
   Serial1.print(d_front_right);
   Serial1.print(" ");
-  Serial1.print(*side_dist);
+  Serial1.print(*d_side_ir_sensors);
   Serial1.print(" ");
-  Serial1.print(*(side_dist+1));
+  Serial1.print(*(d_side_ir_sensors+1));
   Serial1.print(" ");
 }
 
-void update_no_output(){
-  // Variable declarations
-  int* side_dist;
-  int* front_ir_dist;
-  int* sonar_d;
-  float heading;
-  //Distance away from the wall
-  side_dist = get_side_distances();
-  front_ir_dist = get_front_ir_distances();
-  d_front_left = *(front_ir_dist);
-  d_front_right = *(front_ir_dist+1);
+/* Update all sensors (side and front IR sensors, ultrasonic sensor and MPU). */
+void update_no_output() {
+  int* d_side_ir_sensors;
+  int* d_front_ir_sensors;
+  int* d_sonar;
+  float heading_angle;
+
+  // Distances from walls and obstacles.
+  d_side_ir_sensors = get_side_distances();
+  d_front_ir_sensors = get_front_ir_distances();
+  d_front_left = *(d_front_ir_sensors);
+  d_front_right = *(d_front_ir_sensors+1);
   d_front_middle = get_sonar_distance();
-  heading = Read_MPU();
-
+  heading_angle = Read_MPU();
 }
+
 
 /*----------------------------------------------------------------*/
 // SPIRAL CODE:
 /*----------------------------------------------------------------*/
 
-void align(void)
-{
-  // Variable declarations
-  int* side_dist;
-  side_dist = get_side_distances();
-  // Front side sensor reading is greater than rear side sensor. Thus turn ccw.
-  while (( *(side_dist) - *(side_dist+1)) > 15) {
+/* Align the right hand side of the rover chasis parallel to any wall. */
+void align() {
+  int* d_side_ir_sensors;
+  d_side_ir_sensors = get_side_distances();
+
+  // Turn rover ccw while front side sensor reading is greater than the rear side sensor.
+  while ((*(d_side_ir_sensors) - *(d_side_ir_sensors + 1)) > 15) {
     ccw();
     // Update side sensor readings.
-    side_dist = get_side_distances();
+    d_side_ir_sensors = get_side_distances();
   }
   stop();
 
-  // Front side sensor reading is less than rear side sensor. Thus turn cw.
-  while (( *(side_dist) - *(side_dist+1)) < 0) {
+  // Turn rover cw while front side sensor reading is less than the rear side sensor.
+  while ((*(d_side_ir_sensors) - *(d_side_ir_sensors + 1)) < 0) {
     cw();
     // Update side sensor readings.
-    side_dist = get_side_distances();
+    d_side_ir_sensors = get_side_distances();
   }
   stop();
 }
 
 void go_forward_and_align() {
-  // Variable declarations
-  int alignment_gain=4;
-  int* side_dist;
-  side_dist = get_side_distances();
+  int alignment_gain = 4;
+  int* d_side_ir_sensors;
+  d_side_ir_sensors = get_side_distances();
 
-  //Speed_adj is gain needed to turn motor back on course.
-  int speed_adj=alignment_gain*((*(side_dist+1)) - (*(side_dist )));
+  // Calculate gain needed to turn motor back on course.
+  int speed_adj=alignment_gain*((*(d_side_ir_sensors+1)) - (*(d_side_ir_sensors )));
 
   left_front_motor.writeMicroseconds(1500 + speed + speed_adj);
   left_rear_motor.writeMicroseconds(1500 + speed + speed_adj);
@@ -295,11 +291,11 @@ int* get_front_ir_distances() {
 
 int get_sonar_distance() {
     int i, sonar_reading;
-    int* sonar_d;
+    int* d_sonar;
 
     for (i=0; i<(ITERATION_SIZE-1); i++) {
-      sonar_d = ping_location();
-      sonar[i] = *(sonar_d+1);
+      d_sonar = ping_location();
+      sonar[i] = *(d_sonar+1);
     }
 
     sonar_reading = get_median_of_array(sonar, ITERATION_SIZE);
@@ -340,27 +336,26 @@ int* get_side_distances() {
 
 int get_avg_side_distance() {
   // Return side distance from robot to wall. Average of 2 side sensors.
-  int* side_dist;
+  int* d_side_ir_sensors;
   int avg_side_dist;
 
-  side_dist = get_side_distances();
+  d_side_ir_sensors = get_side_distances();
   // First index is front sensor, second index is back sensor.
-  avg_side_dist = (*(side_dist) + *(side_dist + 1))/2;
+  avg_side_dist = (*(d_side_ir_sensors) + *(d_side_ir_sensors + 1))/2;
   return avg_side_dist;
 }
 
 bool is_side_diff_ok() {
   // Return 1 if sensors are within a reasonable difference of each other. Otherwise false.
   // Return of false means there is an object present near to front or back of robot.
-  int* side_dist;
-  side_dist = get_side_distances();
+  int* d_side_ir_sensors;
+  d_side_ir_sensors = get_side_distances();
 
   // 70 is acceptable difference between sensors.
-  if ((abs(*side_dist - *(side_dist+1))) < 70) {
+  if ((abs(*d_side_ir_sensors - *(d_side_ir_sensors+1))) < 70)
     return true;
-  } else {
-    return false;
-  }
+
+  return false;
 }
 
 /*----------------------------------------------------------------*/
@@ -453,13 +448,13 @@ STATE running() {
 
 STATE startup() {
   int avg_side_dist;
-  int* side_dist;
+  int* d_side_ir_sensors;
 
   fast_flash_double_LED_builtin();
   range_and_speed_settings();
   if (is_battery_voltage__not_OK()) return STOPPED;
 
-  side_dist = get_side_distances();
+  d_side_ir_sensors = get_side_distances();
 
   // Align to wall 1
   align();
@@ -468,7 +463,7 @@ STATE startup() {
 
     //Checks if sensors are unbalanced which may indicate obstacle.
     //The robot will turn in order to avoid hitting the obstacle.
-    if ( (*(side_dist) < *(side_dist+1)) ){
+    if ( (*(d_side_ir_sensors) < *(d_side_ir_sensors+1)) ){
       ccw();
     } else {
         cw();
@@ -490,7 +485,7 @@ STATE startup() {
 STATE wall_follow() {
   fast_flash_double_LED_builtin();
   range_and_speed_settings();
-  int* side_dist = get_side_distances();
+  int* d_side_ir_sensors = get_side_distances();
 
   //Have integers for each sensor pair
   int pairL=check_diff(d_front_left,d_front_middle);//Check left IR and sonar for which is greater
@@ -517,7 +512,7 @@ STATE wall_follow() {
   }
 
   // If there is an obstacle to the side, do not reference it. Just go forward for a few iterations.
-  if (abs(*(side_dist) - *(side_dist+1)) > 100) {
+  if (abs(*(d_side_ir_sensors) - *(d_side_ir_sensors+1)) > 100) {
     forward_counter++;
   }
 
@@ -533,9 +528,7 @@ STATE wall_follow() {
     go_forward_and_align();
   }
 
-  //Check if the robot is within the obsacle detection threshold
-
-  //Potentially change to sonar value insted of max_front_d
+  // Reverse if too close to obstacle/wall.
   if ( max_front_d <= (OB_LIMIT)){
       return BACK;
   }
@@ -643,7 +636,7 @@ STATE begin_obstacle_strafe() {
 
 STATE obstacle() {
   // State after strafing left. Go forward and strafe right.
-  int* side_dist;
+  int* d_side_ir_sensors;
   int front_dist = get_avg_front_distance();
   if (is_battery_voltage__not_OK()) return STOPPED;
 
@@ -661,8 +654,8 @@ STATE obstacle() {
   }
 
   forward();
-  side_dist = get_side_distances();
-  if (*(side_dist) < 220) {
+  d_side_ir_sensors = get_side_distances();
+  if (*(d_side_ir_sensors) < 220) {
       //Set flag to true, if obstacle is detected by rear sensor
       ob_on_right = true;
   }
@@ -673,7 +666,7 @@ STATE obstacle() {
     return BEGIN_OBSTACLE_STRAFE;
   }
 
-  if (ob_on_right && (*(side_dist) > 220)&&(((millis()/10)-ob_forward_time)>170)) {
+  if (ob_on_right && (*(d_side_ir_sensors) > 220)&&(((millis()/10)-ob_forward_time)>170)) {
       // No obstacle detected anymore. Set to false.
       ob_on_right = false;
       stop();
@@ -765,7 +758,7 @@ void slow_flash_LED_builtin()
   }
 }
 
-boolean is_battery_voltage__not_OK()
+bool is_battery_voltage__not_OK()
 {
   static unsigned long previous_millis;
 
@@ -781,11 +774,9 @@ boolean is_battery_voltage__not_OK()
     if (speed > 1000)
       speed = 1000;
     speed_change = 0;
-    /*
-    Serial1.print("Battery level:");
-    Serial1.print(Lipo_level_cal);
-    Serial1.println("%");*/
-    if (Lipo_level_cal < 0) return false;
+
+    if (Lipo_level_cal < 0)
+      return false;
   }
   return false;
 }
