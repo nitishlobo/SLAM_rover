@@ -1,42 +1,35 @@
-/* Contains all definitions for the rover states */
+/*  Contains all definitions for the rover states
+ *  Authors: Nitish Lobo & Theo Drissner-Devine
+ */
 
+/* Attach  wheel and front sonar servos variables to the relevant pins */
 STATE initialising() {
   enable_motors();
   enable_servo();
-
-  if (RUN_TEST_STATE_ONLY)
-    return TEST;
-  else:
-    return STARTUP;
+	return STARTUP;
 }
 
-STATE test() {
-  read_Serial11_command();
-  fast_flash_double_LED_builtin();
-  range_and_speed_settings();
+/* Allow developer to test any new logic, code or algorithm.
+ * Also allow anyone to control the rover by sending a serial command */
+STATE test(int speed) {
+	enable_motors();
+	enable_servo();
+	// Allow serial control of rover.
+  read_and_execute_serial_commandspeed);
 
-  // Add any code here to test it out.
+  /* Add any code/logic here to test it out. */
   return TEST;
 }
 
-STATE running() {
-  fast_flash_double_LED_builtin();
-  range_and_speed_settings();
-
-
-  if (is_battery_voltage__not_OK()) return STOPPED;
-  return RUNNING;
-}
-
 STATE startup() {
-  int avg_side_dist;
+  int d_avg_side;
   int* d_side_ir_sensors;
-
-  fast_flash_double_LED_builtin();
-  range_and_speed_settings();
-  if (is_battery_voltage__not_OK()) return STOPPED;
-
   d_side_ir_sensors = get_side_distances();
+
+  blink_onboard_led_quickly();
+  if (is_battery_low())
+    return STOPPED;
+
 
   // Align to wall 1
   align();
@@ -56,26 +49,23 @@ STATE startup() {
   //Move to the right (Closer to the wall) until the selected distance is reached
   strafe_right();
 
-  // Find distance to wall and start wall following if it is close enough
-  avg_side_dist = get_avg_side_distance();
 
-  if ((avg_side_dist < ROBOT_WIDTH) && is_side_diff_ok()) return WALL_FOLLOW;
+  // Find distance to wall and start wall following if it is close enough
+  d_avg_side;= get_avg_side_distance();
+  if ((d_avg_side < ROBOT_WIDTH) && is_side_diff_ok()) return WALL_FOLLOW;
 
   return STARTUP;
 }
 
-STATE wall_follow() {
-  fast_flash_double_LED_builtin();
-  range_and_speed_settings();
+STATE wall_follow(int speed) {
+  blink_onboard_led_quickly();
   int* d_side_ir_sensors = get_side_distances();
 
   //Have integers for each sensor pair
   int pairL=check_diff(d_front_left,d_front_middle);//Check left IR and sonar for which is greater
   int pairR=check_diff(d_front_right,d_front_middle);//Check right IR and sonar
 
-  int max_front_d=d_front_left;
-  //int front_dist = get_avg_front_distance();
-  //Make front dist the maximum front D
+  int max_front_d = d_front_left;
 
   if(d_front_middle>max_front_d)
   {
@@ -99,7 +89,7 @@ STATE wall_follow() {
   }
 
   if (forward_counter > 0) {
-    forward();
+    forward(speed);
     forward_counter++;
 
     if (forward_counter > 15) {
@@ -128,9 +118,8 @@ STATE wall_follow() {
 }
 
 STATE corner() {
-  int avg_side_dist;
-  fast_flash_double_LED_builtin();
-  range_and_speed_settings();
+  int d_avg_side;
+  blink_onboard_led_quickly();
   int i = 0;
 
   //Reset obstacle behind flag
@@ -144,7 +133,8 @@ STATE corner() {
   delay(500);
   align();
 
-  if (is_battery_voltage__not_OK()) return STOPPED;
+  if (is_battery_low())
+    return STOPPED;
   //Strafe right until the robot is desired distance to wall
 
   if(ob_in_front == false)
@@ -153,16 +143,16 @@ STATE corner() {
         strafe_left();
         update_and_output();
         Serial1.println("11");
-        avg_side_dist = get_avg_side_distance();
-    } while (avg_side_dist<d_wall);
+        d_avg_side = get_avg_side_distance();
+    } while (d_avg_side<d_wall);
   }
 
   do {
       strafe_right();
       update_and_output();
       Serial1.println("11");
-      avg_side_dist = get_avg_side_distance();
-  } while (avg_side_dist>d_wall);
+      d_avg_side = get_avg_side_distance();
+  } while (d_avg_side>d_wall);
 
   stop();
   for(i = 0; i  < 10; i++)
@@ -186,9 +176,9 @@ STATE back(){
 
 STATE begin_obstacle_strafe() {
   // Strafe left to avoid obstacle
-  fast_flash_double_LED_builtin();
-  range_and_speed_settings();
-  if (is_battery_voltage__not_OK()) return STOPPED;
+  blink_onboard_led_quickly();
+  if (is_battery_low())
+    return STOPPED;
 
   ob_in_front=true;
 
@@ -216,11 +206,12 @@ STATE begin_obstacle_strafe() {
   }
 }
 
-STATE obstacle() {
+STATE obstacle(int speed) {
   // State after strafing left. Go forward and strafe right.
   int* d_side_ir_sensors;
   int front_dist = get_avg_front_distance();
-  if (is_battery_voltage__not_OK()) return STOPPED;
+  if (is_battery_low())
+    return STOPPED;
 
   //Have integers for each sensor pair
   int pairL=check_diff(d_front_left,d_front_middle);//Check left IR and sonar for which is greater
@@ -235,7 +226,7 @@ STATE obstacle() {
     max_front_d=d_front_right;
   }
 
-  forward();
+  forward(speed);
   d_side_ir_sensors = get_side_distances();
   if (*(d_side_ir_sensors) < 220) {
       //Set flag to true, if obstacle is detected by rear sensor
@@ -272,9 +263,9 @@ STATE obstacle() {
 STATE end_obstacle_strafe() {
   // Avoided obstacle now strafe right.
   int dist;
-  fast_flash_double_LED_builtin();
-  range_and_speed_settings();
-  if (is_battery_voltage__not_OK()) return STOPPED;
+  blink_onboard_led_quickly();
+  if (is_battery_low())
+    return STOPPED;
 
   dist = get_avg_side_distance();
   if (dist <= d_wall) {
@@ -288,25 +279,7 @@ STATE end_obstacle_strafe() {
 }
 
 STATE stopped() {
-  static byte counter_lipo_voltage_ok;
-  static unsigned long previous_millis;
-
   disable_motors();
   slow_flash_LED_builtin();
-
-  // Print massage every 500ms
-  if (millis() - previous_millis > 500) {
-    previous_millis = millis();
-    Serial1.println("Lipo voltage too LOW, any lower and the lipo with be damaged");
-    Serial1.println("Please Re-charge Lipo");
-  }
-  // 500ms timed if statement to check lipo and output speed settings
-  if (!is_battery_voltage__not_OK()) {
-    counter_lipo_voltage_ok++;
-    if (counter_lipo_voltage_ok > 20) { // Making sure lipo voltage is stable
-      counter_lipo_voltage_ok = 0;
-      return RUNNING;
-    }
-  } else counter_lipo_voltage_ok = 0;
   return STOPPED;
 }

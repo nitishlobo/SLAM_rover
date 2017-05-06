@@ -47,88 +47,86 @@ bool strafed_past_ob = false;
 int ob_counter = 0;
 int forward_counter = 0;
 
-// Set servo motors to a small initial angle of 200 microseconds
-// Ie. 72 degrees since 1000 ms is 360 degrees.
+// Set servo motors to a small initial angle of
+// 200 microseconds (ie. 72 degrees) since 1000 ms is 360 degrees.
 int speed = 200;
 // Dynamic speed change of servos depending on input from serial command.
 int speed_change;
 
-void setup(void)
-{
+void setup(void) {
   pinMode(LED_BUILTIN, OUTPUT);
   // Open Serial1 comms to bluetooth module
   Serial1.begin(115200);
-  //Starts up I2C bus for reading from MPU
+  //Start up I2C bus for reading from MPU
   MPU_setup();
 }
 
-void loop(void)
-{
-  static STATE machine_state = INITIALISING;
+void loop(void) {
+  static STATE machine_state;
+  if (RUN_TEST_STATE_ONLY) {
+    machine_state = TEST;
+  } else {
+    machine_state = INITIALISING;
+  }
 
-  // Output
-  if (machine_state != INITIALISING ) {
+  if (machine_state != INITIALISING) {
     update_and_output();
   }
-  //Finite-state machine Code
+
+  // Finite state machine
+  // Serial print and send data via bluetooth to allow LabVIEW to determine states.
   switch (machine_state) {
     case INITIALISING:
-      machine_state = initialising();
-      //Serial1.println("1");
-      break;
-    case TEST:
-      machine_state=test();
-      Serial1.println("2");
-      break;
-    case RUNNING:
-      machine_state =  running();
-      Serial1.println("3");
-      break;
-    case STARTUP:
-      machine_state =  startup();
-      Serial1.println("4");
-      break;
-    case WALL_FOLLOW:
-      machine_state =  wall_follow();
-      Serial1.println("5");
-      break;
-    case CORNER:
+    machine_state = initialising();
+    break;
+  case TEST:
+    Serial1.println("2");
+    machine_state = test(speed);
+    break;
+  case STARTUP:
+    Serial1.println("4");
+    machine_state = startup();
+    break;
+  case WALL_FOLLOW:
+    Serial1.println("5");
+    machine_state = wall_follow(speed);
+    break;
+  case CORNER:
     Serial1.println("6");
-      machine_state =  corner();
-      direction++;
-      total_turn++;
-      if(total_turn>11){
-        machine_state=stopped();
-      }
-      if (direction > 3) {
-        // Increment the turn distance from the wall by robot width
-        d_wall = d_wall + ROBOT_WIDTH;
-        // Direction resets to 0 after 4 turns because robot is now travelling in the same direction as initial direction.
-        direction = 0;
-        //Has finished the first loop
-        ir_calibration=0.1;
-      }
-
-      break;
-    case BEGIN_OBSTACLE_STRAFE:
-      machine_state = begin_obstacle_strafe();
-      Serial1.println("7");
-      break;
-    case OBSTACLE:
-      machine_state =  obstacle();
-      Serial1.println("8");
-      break;
-    case END_OBSTACLE_STRAFE:
-      machine_state =  end_obstacle_strafe();
-      Serial1.println("9");
-      break;
-    case STOPPED:
-      machine_state =  stopped();
-      Serial1.println("10");
-      break;
-    case BACK:
-      machine_state = back();
-      Serial1.println("12");
+    machine_state = corner();
+    direction++;
+    total_turn++;
+    if(total_turn > 11){
+      machine_state = stopped();
+    }
+    if (direction > 3) {
+      // Increment the turn distance from the wall by robot width.
+      d_wall = d_wall + ROBOT_WIDTH;
+      // Direction resets to 0 after 4 turns because robot is now travelling in the same direction as initial direction.
+      direction = 0;
+      // Caliberate to get more sensitivity after finishing first loop.
+      ir_calibration = 0.1;
+    }
+    break;
+  case BEGIN_OBSTACLE_STRAFE:
+    Serial1.println("7");
+    machine_state = begin_obstacle_strafe();
+    break;
+  case OBSTACLE:
+    Serial1.println("8");
+    machine_state = obstacle(speed);
+    break;
+  case END_OBSTACLE_STRAFE:
+    Serial1.println("9");
+    machine_state = end_obstacle_strafe();
+    break;
+  case STOPPED:
+    Serial1.println("10");
+    machine_state = stopped();
+    break;
+  case BACK:
+    Serial1.println("12");
+    machine_state = back();
   }
 }
 
@@ -216,7 +214,7 @@ void go_forward_and_align() {
   d_side_ir_sensors = get_side_distances();
 
   // Calculate gain needed to turn motor back on course.
-  int speed_adj=alignment_gain*((*(d_side_ir_sensors+1)) - (*(d_side_ir_sensors )));
+  int speed_adj = alignment_gain * ((*(d_side_ir_sensors+1)) - (*(d_side_ir_sensors)));
 
   left_front_motor.writeMicroseconds(1500 + speed + speed_adj);
   left_rear_motor.writeMicroseconds(1500 + speed + speed_adj);
@@ -334,15 +332,15 @@ int* get_side_distances() {
   return dist;
 }
 
-int get_avg_side_distance() {
+int get_d_avg_sideance() {
   // Return side distance from robot to wall. Average of 2 side sensors.
   int* d_side_ir_sensors;
-  int avg_side_dist;
+  int d_avg_side;
 
   d_side_ir_sensors = get_side_distances();
   // First index is front sensor, second index is back sensor.
-  avg_side_dist = (*(d_side_ir_sensors) + *(d_side_ir_sensors + 1))/2;
-  return avg_side_dist;
+  d_avg_side = (*(d_side_ir_sensors) + *(d_side_ir_sensors + 1))/2;
+  return d_avg_side;
 }
 
 bool is_side_diff_ok() {
@@ -414,7 +412,9 @@ int check_diff (int left_val, int right_val){
 /*----------------------------------------------------------------*/
 // DEFAULT FUNCTIONS CODE:
 /*----------------------------------------------------------------*/
-void fast_flash_double_LED_builtin()
+
+/* Blink built in arduino led really fast. */
+void blink_onboard_led_quickly()
 {
   static byte indexer = 0;
   static unsigned long fast_flash_millis;
@@ -440,170 +440,176 @@ void slow_flash_LED_builtin()
   }
 }
 
-bool is_battery_voltage__not_OK()
+bool is_battery_low()
 {
-  static unsigned long previous_millis;
+  // LiPo battery is either in depleted state (0V to 3.1V) or in charged state (4.2V to 4.25V)
+  // analogRead() returns 635 units for 3.1V
+  if (analogRead(A0) < 635)
+    return true;
 
-  if (millis() - previous_millis > 500) { //500ms timed if statement to check lipo and output speed settings
-    previous_millis = millis();
-    //the voltage of a LiPo cell depends on its chemistry and varies from about 2.7-3.1 V (discharged) = 620(3.1V Min)
-    //to about 4.20-4.25 V (fully charged) = 820(4.1V Max)
-    int Lipo_level_cal = ((analogRead(A0) - 620) * 100) / 200;
+  return false;
 
 
     speed += speed_change;
     if (speed > 1000)
       speed = 1000;
     speed_change = 0;
-
-    if (Lipo_level_cal < 0)
-      return false;
-  }
-  return false;
 }
 
-void range_and_speed_settings()
-{
-  static unsigned long previous_millis;
-
-  // 500ms timed if statement to check lipo and output speed settings
-  if (millis() - previous_millis > 500)
-    previous_millis = millis();
-
-}
-
-void read_Serial11_command()
-{
+void read_and_execute_serial_commandspeed) {
   if (Serial1.available()) {
     char val = Serial1.read();
     Serial1.print("Speed:");
     Serial1.print(speed);
     Serial1.print(" ms ");
 
-    //Perform an action depending on the command
+    // Perform an action depending on the input via serial.
     switch (val) {
-      case 'w'://Move Forward
+      case 'w':
       case 'W':
-        forward ();
         Serial1.println("Forward");
+        forward(speed);
         break;
-      case 's'://Move Backwards
+      case 's':
       case 'S':
-        reverse ();
         Serial1.println("Backwards");
+        reverse();
         break;
-      case 'q'://Turn Left
+      case 'q':
       case 'Q':
+        Serial1.println("Strafe left");
         strafe_left();
-        Serial1.println("Strafe Left");
         break;
-      case 'e'://Turn Right
+      case 'e':
       case 'E':
+        Serial1.println("Strafe right");
         strafe_right();
-        Serial1.println("Strafe Right");
         break;
-      case 'a'://Turn Right
+      case 'a':
       case 'A':
+        // Spin counter-clockwise
+        Serial1.println("Ccw");
         ccw();
-        Serial1.println("ccw");
         break;
-      case 'd'://Turn Right
+      case 'd':
       case 'D':
+        // Spin clockwise
         cw();
-        Serial1.println("cw");
+        Serial1.println("Cw");
         break;
-      case '-'://Turn Right
+      case '-':
       case '_':
+        // Decrease speed
         speed_change = -100;
         Serial1.println("-100");
         break;
       case '=':
       case '+':
+        // Increase speed
         speed_change = 100;
-        Serial1.println("+");
+        Serial1.println("+100");
         break;
       default:
+        // Rover is powered on but stationary.
         stop();
-        Serial1.println("stop");
+        Serial1.println("Stop");
         break;
     }
-
   }
-
 }
 
-void disable_motors()
-{
-  left_front_motor.detach();  // detach the servo on pin left_front to the servo object
-  left_rear_motor.detach();  // detach the servo on pin left_rear to the servo object
-  right_rear_motor.detach();  // detach the servo on pin right_rear to the servo object
-  right_front_motor.detach();  // detach the servo on pin right_front to the servo object
 
+
+/* Configure motors to their corresponding pins. */
+void enable_motors() {
+  // Attach servo objects to the corresponding pins.
+  left_front_motor.attach(left_front);
+  left_rear_motor.attach(left_rear);
+  right_rear_motor.attach(right_rear);
+  right_front_motor.attach(right_front);
+}
+
+/* Detach motors from their pins and pull pin state to
+ * low or high depending on whether pull-down/pull-up resistors are used. */
+void disable_motors() {
+  // Detach servo objects from the pins.
+  left_front_motor.detach();
+  left_rear_motor.detach();
+  right_rear_motor.detach();
+  right_front_motor.detach();
+
+  // Do not allow floating voltages on the pins.
   pinMode(left_front, INPUT);
   pinMode(left_rear, INPUT);
   pinMode(right_rear, INPUT);
   pinMode(right_front, INPUT);
 }
 
-void enable_motors()
-{
-  left_front_motor.attach(left_front);  // attaches the servo on pin left_front to the servo object
-  left_rear_motor.attach(left_rear);  // attaches the servo on pin left_rear to the servo object
-  right_rear_motor.attach(right_rear);  // attaches the servo on pin right_rear to the servo object
-  right_front_motor.attach(right_front);  // attaches the servo on pin right_front to the servo object
+/* Move omni-directional wheeled rover foward. */
+void forward(int speed) {
+  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
+  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
+  left_front_motor.writeMicroseconds(1500 + speed);
+  left_rear_motor.writeMicroseconds(1500 + speed);
+  right_rear_motor.writeMicroseconds(1500 - speed);
+  right_front_motor.writeMicroseconds(1500 - speed);
 }
-void stop() //Stop
-{
+
+/* Move omni-directional wheeled rover backwards. */
+void reverse() {
+  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
+  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
+  left_front_motor.writeMicroseconds(1500 - speed);
+  left_rear_motor.writeMicroseconds(1500 - speed);
+  right_rear_motor.writeMicroseconds(1500 + speed);
+  right_front_motor.writeMicroseconds(1500 + speed);
+}
+
+/* Move omni-directional wheeled rover to the left without turning. */
+void strafe_left() {
+  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
+  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
+  left_front_motor.writeMicroseconds(1500 - speed);
+  left_rear_motor.writeMicroseconds(1500 + speed);
+  right_rear_motor.writeMicroseconds(1500 + speed);
+  right_front_motor.writeMicroseconds(1500 - speed);
+}
+
+/* Move omni-directional wheeled rover to the right without turning. */
+void strafe_right() {
+  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
+  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
+  left_front_motor.writeMicroseconds(1500 + speed);
+  left_rear_motor.writeMicroseconds(1500 - speed);
+  right_rear_motor.writeMicroseconds(1500 - speed);
+  right_front_motor.writeMicroseconds(1500 + speed);
+}
+
+/* Spin omni-directional wheeled rover counter-clockwise. */
+void ccw() {
+  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
+  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
+  left_front_motor.writeMicroseconds(1500 - speed);
+  left_rear_motor.writeMicroseconds(1500 - speed);
+  right_rear_motor.writeMicroseconds(1500 - speed);
+  right_front_motor.writeMicroseconds(1500 - speed);
+}
+
+/* Spin omni-directional wheeled rover clockwise. */
+void cw() {
+  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
+  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
+  left_front_motor.writeMicroseconds(1500 + speed);
+  left_rear_motor.writeMicroseconds(1500 + speed);
+  right_rear_motor.writeMicroseconds(1500 + speed);
+  right_front_motor.writeMicroseconds(1500 + speed);
+}
+
+/* Stop rover wheels. */
+void stop() {
+  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
   left_front_motor.writeMicroseconds(1500);
   left_rear_motor.writeMicroseconds(1500);
   right_rear_motor.writeMicroseconds(1500);
   right_front_motor.writeMicroseconds(1500);
-}
-
-void forward()
-{
-  left_front_motor.writeMicroseconds(1500 + speed);
-  left_rear_motor.writeMicroseconds(1500 + speed);
-  right_rear_motor.writeMicroseconds(1500 - speed);
-  right_front_motor.writeMicroseconds(1500 - speed);
-}
-
-void reverse ()
-{
-  left_front_motor.writeMicroseconds(1500 - speed);
-  left_rear_motor.writeMicroseconds(1500 - speed);
-  right_rear_motor.writeMicroseconds(1500 + speed);
-  right_front_motor.writeMicroseconds(1500 + speed);
-}
-
-void ccw ()
-{
-  left_front_motor.writeMicroseconds(1500 - speed);
-  left_rear_motor.writeMicroseconds(1500 - speed);
-  right_rear_motor.writeMicroseconds(1500 - speed);
-  right_front_motor.writeMicroseconds(1500 - speed);
-}
-
-void cw ()
-{
-  left_front_motor.writeMicroseconds(1500 + speed);
-  left_rear_motor.writeMicroseconds(1500 + speed);
-  right_rear_motor.writeMicroseconds(1500 + speed);
-  right_front_motor.writeMicroseconds(1500 + speed);
-}
-
-void strafe_left ()
-{
-  left_front_motor.writeMicroseconds(1500 - speed);
-  left_rear_motor.writeMicroseconds(1500 + speed);
-  right_rear_motor.writeMicroseconds(1500 + speed);
-  right_front_motor.writeMicroseconds(1500 - speed);
-}
-
-void strafe_right ()
-{
-  left_front_motor.writeMicroseconds(1500 + speed);
-  left_rear_motor.writeMicroseconds(1500 - speed);
-  right_rear_motor.writeMicroseconds(1500 - speed);
-  right_front_motor.writeMicroseconds(1500 + speed);
 }

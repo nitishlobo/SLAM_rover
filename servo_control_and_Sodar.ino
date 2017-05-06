@@ -25,13 +25,13 @@
 // Servo Code: initilises at angle 93, angle 98 is straight ahead for the sonar
 //             range of 81, for depth array, angle 58=0, angle 138 = 80
 /*----------------------------------------------------------------*/
-void enable_servo ()
+void enable_servo()
  {
    servo_centre.attach(servo_pin);  // attaches the servo on pin left_front to the servo object
    //Serial1.println("Enabling Servo...");
  }
 
- void disable_servo ()
+ void disable_servo()
 {
   servo_centre.detach();  // detach the servo on pin left_front to the servo object
 
