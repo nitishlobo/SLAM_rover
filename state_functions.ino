@@ -2,7 +2,9 @@
  *  Authors: Nitish Lobo & Theo Drissner-Devine
  */
 
-/* Attach  wheel and front sonar servos variables to the relevant pins */
+/* Attach  wheel and front sonar servos variables to the relevant pins.
+ * Return next state (STARTUP state).
+ */
 STATE initialising() {
   enable_motors();
   enable_servo();
@@ -10,276 +12,249 @@ STATE initialising() {
 }
 
 /* Allow developer to test any new logic, code or algorithm.
- * Also allow anyone to control the rover by sending a serial command */
-STATE test(int speed) {
+ * Also allow anyone to control the rover by sending a serial command.
+ * Return same state.
+ */
+STATE test() {
 	enable_motors();
 	enable_servo();
 	// Allow serial control of rover.
-  read_and_execute_serial_commandspeed);
+  read_and_execute_serial_command(speed);
 
   /* Add any code/logic here to test it out. */
   return TEST;
 }
 
+/* Get rover to align to the closest wall and avoid all obstacles while doing it.
+ * Return next state (either same state or WALL_FOLLOW state).
+ */
 STATE startup() {
   int d_avg_side;
   int* d_side_ir_sensors;
   d_side_ir_sensors = get_side_distances();
 
   blink_onboard_led_quickly();
-  if (is_battery_low())
-    return STOPPED;
 
-
-  // Align to wall 1
+  // Align rover chassis to be paralled to any wall to its right hand side.
   align();
-  if (is_side_diff_ok() == false) {
-    //Check which sensor on which side is closer to wall.
-
-    //Checks if sensors are unbalanced which may indicate obstacle.
-    //The robot will turn in order to avoid hitting the obstacle.
-    if ( (*(d_side_ir_sensors) < *(d_side_ir_sensors+1)) ){
+  if (is_rover_parallel_to_wall() == false) {
+    // Turn the rover away from the obstacle which is causing the side sensors not give the same reading.
+    if ((*(d_side_ir_sensors) < *(d_side_ir_sensors+1))) {
       ccw();
     } else {
-        cw();
+      cw();
     }
-    // TODO: Redo this turn delay part by using the function with the correct linear trend equation
     delay(TURN_DELAY);
   }
-  //Move to the right (Closer to the wall) until the selected distance is reached
+  // Move closer to the wall.
   strafe_right();
 
-
-  // Find distance to wall and start wall following if it is close enough
-  d_avg_side;= get_avg_side_distance();
-  if ((d_avg_side < ROBOT_WIDTH) && is_side_diff_ok()) return WALL_FOLLOW;
+  // Start following the wall if the rover is close to and aligned with the wall.
+  d_avg_side = get_avg_side_distance();
+  if ((d_avg_side < ROBOT_WIDTH) && is_rover_parallel_to_wall())
+    return WALL_FOLLOW;
 
   return STARTUP;
 }
 
-STATE wall_follow(int speed) {
-  blink_onboard_led_quickly();
-  int* d_side_ir_sensors = get_side_distances();
+/* Drive rover forward whilst keeping it parallel to the wall.
+ * Return next state (either BEGIN_OBSTACLE_STRAFE, BACK, CORNER or WALL_FOLLOW).
+ */
+STATE wall_follow() {
+  // Compare front sensors (left: IR sensor, middle: sonar, right: IR sensor).
+  int front_left_pair = check_diff(d_front_left, d_front_middle);
+  int front_right_pair = check_diff(d_front_right, d_front_middle);
 
-  //Have integers for each sensor pair
-  int pairL=check_diff(d_front_left,d_front_middle);//Check left IR and sonar for which is greater
-  int pairR=check_diff(d_front_right,d_front_middle);//Check right IR and sonar
-
-  int max_front_d = d_front_left;
-
-  if(d_front_middle>max_front_d)
-  {
-    max_front_d=d_front_middle;
-  }
-
-  if(d_front_right>max_front_d)
-  {
-    max_front_d=d_front_right;
-  }
+  // Determine the longest distance read from front sensors.
+  int d_max_front = d_front_left;
+  if(d_front_middle > d_max_front)
+    d_max_front = d_front_middle;
+  if(d_front_right > d_max_front)
+    d_max_front = d_front_right;
 
   if (is_obstacle_present() == true)
   {
-    ob_strafe_time=millis()/10;//Record time starting strafe
+    // Record time starting strafe.
+    ob_strafe_time = millis()/10;
     return BEGIN_OBSTACLE_STRAFE;
   }
 
-  // If there is an obstacle to the side, do not reference it. Just go forward for a few iterations.
-  if (abs(*(d_side_ir_sensors) - *(d_side_ir_sensors+1)) > 100) {
+  // Do not reference the side if any obstacle is present, instead go forward for a few iterations.
+  int* d_side_ir_sensors = get_side_distances();
+  if (abs(*(d_side_ir_sensors) - *(d_side_ir_sensors + 1)) > 100) {
     forward_counter++;
   }
 
   if (forward_counter > 0) {
-    forward(speed);
+    forward();
     forward_counter++;
 
-    if (forward_counter > 15) {
-      // Reset the iteration. Gone past obstacle, go back to forward and align.
+    // Gone past the obstacle.
+    if (forward_counter > 15)
       forward_counter = 0;
-    }
   } else {
     go_forward_and_align();
   }
 
   // Reverse if too close to obstacle/wall.
-  if ( max_front_d <= (OB_LIMIT)){
-      return BACK;
-  }
-  //The robot will not turn unless it is close enough to tell the difference betweent the wall and obstacle
-  if ((max_front_d > 0) && (max_front_d <= d_wall)){
-    if (max_front_d<OB_LIMIT){
-          return CORNER;
-    }
-  }
+  if (d_max_front <= (OB_LIMIT))
+    return BACK;
 
-
-
+  // Only turn the rover if it is close enough to tell the difference between a wall and an obstacle.
+  if ((d_max_front > 0) && (d_max_front <= d_wall) && (d_max_front < OB_LIMIT))
+    return CORNER;
 
   return WALL_FOLLOW;
 }
 
+/* Turn rover when it approaches a wall to its front.
+ * Rover will not turn if it approaches an obstacle and will instead strafe to avoid hitting it.
+ * Return next state (WALL_FOLLOW state).
+ */
 STATE corner() {
   int d_avg_side;
-  blink_onboard_led_quickly();
   int i = 0;
-
-  //Reset obstacle behind flag
   ob_in_front = false;
 
-  //Turn approximatly 90 deg to line up with next wall
+  // Turn approximately 90 degrees to align to the next wall.
   ccw();
-  // TODO: Redo this turn delay part by using the function with the correct linear trend equation
   delay(TURN_DELAY);
   stop();
   delay(500);
   align();
 
-  if (is_battery_low())
-    return STOPPED;
-  //Strafe right until the robot is desired distance to wall
-
-  if(ob_in_front == false)
-  {
+  // Move rover away from the wall because its 90 degree turn will bring it close to the wall.
+  if (ob_in_front == false) {
     do {
-        strafe_left();
-        update_and_output();
-        Serial1.println("11");
-        d_avg_side = get_avg_side_distance();
-    } while (d_avg_side<d_wall);
+      strafe_left();
+      update_and_output();
+      Serial1.println("11");
+      d_avg_side = get_avg_side_distance();
+    } while (d_avg_side < d_wall);
   }
 
+  // Bring rover closer to the right wall.
   do {
       strafe_right();
       update_and_output();
       Serial1.println("11");
       d_avg_side = get_avg_side_distance();
-  } while (d_avg_side>d_wall);
+  } while (d_avg_side > d_wall);
 
   stop();
-  for(i = 0; i  < 10; i++)
-  {
+
+  // Update sensors multiple times to have more sample data points to filter over.
+  for (i=0; i<10; i++)
     update_no_output();
-  }
 
   return WALL_FOLLOW;
 }
 
-STATE back(){
-
-  if ((d_front_middle)<(d_wall-100)){
+/* Move the rover backwards.
+ * Return next state (either the same state or corner).
+ */
+STATE back() {
+  if ((d_front_middle) < (d_wall - 100)) {
     reverse();
-
     return BACK;
   }
-
   return CORNER;
 }
 
+/* Strafe rover to left to avoid hitting obstacle.
+ * Return next state.
+ */
 STATE begin_obstacle_strafe() {
-  // Strafe left to avoid obstacle
-  blink_onboard_led_quickly();
-  if (is_battery_low())
-    return STOPPED;
-
-  ob_in_front=true;
-
-  if (d_front_right < 300) {
+  ob_in_front = true;
+  if (d_front_right < 300)
     strafed_past_ob = true;
-  }
 
-
-  //Exit the case when all three front sensors > 240, otherwise keep strafing left.
-  if ((d_front_left>240)&&(d_front_right>240)&&(d_front_middle>240)&& strafed_past_ob) {
+  // Exit the case when all three front sensors > 240, otherwise keep strafing left.
+  if ((d_front_left > 240) && (d_front_right > 240) && (d_front_middle > 240) && strafed_past_ob) {
     stop();
     strafed_past_ob = false;
-    //Reset counter
     ob_forward_time= (millis()/10);
     return OBSTACLE;
   } else {
     strafe_left();
-    //Timeout from state
-    if (((millis()/10)-ob_strafe_time)>300){
-      //Reset counter
-      ob_forward_time= (millis()/10);
+    // Timeout to next state (ie. assume wrong sensor readings after 3 seconds).
+    if (((millis()/10) - ob_strafe_time) > 300) {
+      ob_forward_time = (millis()/10);
       return OBSTACLE;
     }
     return BEGIN_OBSTACLE_STRAFE;
   }
 }
 
-STATE obstacle(int speed) {
-  // State after strafing left. Go forward and strafe right.
+/* Overtake obstacle (ie. move rover forward past obstacle).
+ * Return next state (either BEGIN_OBSTACLE_STRAFE, same state, END_OBSTACLE_STRAFE or CORNER).
+ */
+STATE obstacle() {
   int* d_side_ir_sensors;
   int front_dist = get_avg_front_distance();
-  if (is_battery_low())
-    return STOPPED;
 
-  //Have integers for each sensor pair
-  int pairL=check_diff(d_front_left,d_front_middle);//Check left IR and sonar for which is greater
-  int pairR=check_diff(d_front_right,d_front_middle);//Check right IR and sonar
+  // Compare front sensors (left: IR sensor, middle: sonar, right: IR sensor).
+  int front_left_pair = check_diff(d_front_left, d_front_middle);
+  int front_right_pair = check_diff(d_front_right, d_front_middle);
 
-  //Make front dist the maximum front D
-  int max_front_d=d_front_left;
-  if(d_front_middle>max_front_d) {
-    max_front_d=d_front_middle;
-  }
-  if(d_front_right>max_front_d) {
-    max_front_d=d_front_right;
-  }
+  // Determine the longest distance read from front sensors.
+  int d_max_front = d_front_left;
+  if(d_front_middle > d_max_front)
+    d_max_front = d_front_middle;
+  if(d_front_right > d_max_front)
+    d_max_front = d_front_right;
 
-  forward(speed);
+  forward();
   d_side_ir_sensors = get_side_distances();
-  if (*(d_side_ir_sensors) < 220) {
-      //Set flag to true, if obstacle is detected by rear sensor
-      ob_on_right = true;
-  }
+  // Use side sensor to detect whether rover has obstacle to its right.
+  if (*(d_side_ir_sensors) < 220)
+    ob_on_right = true;
 
+  // Detect whether rover has another obstacle on the front side.
   if (is_obstacle_present() == true)
   {
-    ob_strafe_time=(millis()/10);
+    ob_strafe_time = (millis()/10);
     return BEGIN_OBSTACLE_STRAFE;
   }
 
-  if (ob_on_right && (*(d_side_ir_sensors) > 220)&&(((millis()/10)-ob_forward_time)>170)) {
-      // No obstacle detected anymore. Set to false.
+  // No obstacle detected.
+  if (ob_on_right && (*(d_side_ir_sensors) > 220) && (((millis()/10) - ob_forward_time) > 170)) {
       ob_on_right = false;
       stop();
       return END_OBSTACLE_STRAFE;
   }
 
-  if ((max_front_d > 0) && (max_front_d <= d_wall)){
-    if ((pairR==0)&&(pairL==0)){
+  if ((d_max_front > 0) && (d_max_front <= d_wall)) {
+    if ((front_right_pair == 0) && (front_left_pair == 0))
       return CORNER;
-    }
   }
 
-  //Time out of obstacle aviod Function
-  if (((millis()/10)-ob_forward_time)>200){
+  // Timeout to next state (ie. assume wrong sensor readings after 2 seconds).
+  if (((millis()/10) - ob_forward_time) > 200)
     return END_OBSTACLE_STRAFE;
-  }
 
   return OBSTACLE;
 }
 
+/* Move rover to its original path after overtaking obstacle.
+ * Return next state (either WALL_FOLLOW or same state).
+ */
 STATE end_obstacle_strafe() {
-  // Avoided obstacle now strafe right.
   int dist;
-  blink_onboard_led_quickly();
-  if (is_battery_low())
-    return STOPPED;
-
   dist = get_avg_side_distance();
   if (dist <= d_wall) {
-    // Exit case if returned to original path (before obstacle avoidance).
     return WALL_FOLLOW;
   } else {
-    // Continue to strafe to original path.
     strafe_right();
     return END_OBSTACLE_STRAFE;
   }
 }
 
+/* Stop rover.
+ * Return same state.
+ */
 STATE stopped() {
   disable_motors();
-  slow_flash_LED_builtin();
+  blink_onboard_led_slowly();
   return STOPPED;
 }

@@ -27,13 +27,13 @@
 /*----------------------------------------------------------------*/
 void enable_servo()
  {
-   servo_centre.attach(servo_pin);  // attaches the servo on pin left_front to the servo object
+   servo_centre.attach(servo_pin);  // attaches the servo on pin front_left to the servo object
    //Serial1.println("Enabling Servo...");
  }
 
  void disable_servo()
 {
-  servo_centre.detach();  // detach the servo on pin left_front to the servo object
+  servo_centre.detach();  // detach the servo on pin front_left to the servo object
 
   pinMode(servo_pin, INPUT);
 }
