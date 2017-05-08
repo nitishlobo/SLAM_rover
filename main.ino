@@ -79,6 +79,7 @@ void loop(void) {
 
   if (machine_state != INITIALISING) {
     update_and_output();
+    update_speed();
   }
 
   // Finite state machine
@@ -340,7 +341,7 @@ int* get_side_distances() {
   return dist;
 }
 
-int get_d_avg_sideance() {
+int get_avg_side_distance() {
   // Return side distance from robot to wall. Average of 2 side sensors.
   int* d_side_ir_sensors;
   int d_avg_side;
@@ -365,60 +366,6 @@ bool is_rover_parallel_to_wall() {
 }
 
 /*----------------------------------------------------------------*/
-// OBSTACLE CODE:
-/*----------------------------------------------------------------*/
-bool is_obstacle_present() {
-  bool A,B,C; //Boolean values which indicte whether an obstacle
-  // is less than X mm from Left,  mid, right sensors respectively
-  int tolerance = OB_LIMIT;
-
-  A = (d_front_left < tolerance);
-  B = (d_front_middle < tolerance);
-  C = (d_front_right < tolerance);
-
-  // Using truth table
-  if(((!A) && B) || ((!A) && C) || (A && (!C))) {
-    ob_counter++;
-  } else {
-    ob_counter=0;
-  }
-
-  if (ob_counter > 5)
-    return true;
-
-  return false;
-}
-
-int check_diff(int left_val, int right_val) {
-    //Function checks which value is greater
-    //Returns -1 for left, 0 for equal and 1 for right_val
-   //tolerance of 20% difference
-  int average=(left_val+right_val)/2;
-
-  float tolerance=average* ir_calibration; //tolerance of 20% difference
-  int difference=left_val-right_val;
-
-  //If difference is within tolerance return 0 for equal
-  if (abs(difference)<tolerance) {
-    return 0;
-  }
-
-  //If left is greater, return -1
-  if (difference>0) {
-    return -1;
-  }
-
-  //If right is greater, return 1
-  if (difference<0) {
-    return 1;
-  }
-
-  return 2; // Should never happen, error check
-}
-
-
-
-/*----------------------------------------------------------------*/
 // DEFAULT FUNCTIONS CODE:
 /*----------------------------------------------------------------*/
 
@@ -440,8 +387,7 @@ void blink_onboard_led_quickly()
   }
 }
 
-void blink_onboard_led_slowly()
-{
+void blink_onboard_led_slowly() {
   static unsigned long slow_flash_millis;
   if (millis() - slow_flash_millis > 2000) {
     slow_flash_millis = millis();
@@ -449,23 +395,26 @@ void blink_onboard_led_slowly()
   }
 }
 
-bool is_battery_low()
-{
+/* Check status of battery powering rover servos. */
+bool is_battery_low() {
   // LiPo battery is either in depleted state (0V to 3.1V) or in charged state (4.2V to 4.25V)
   // analogRead() returns 635 units for 3.1V
   if (analogRead(A0) < 635)
     return true;
 
   return false;
-
-
-    speed += speed_change;
-    if (speed > 1000)
-      speed = 1000;
-    speed_change = 0;
 }
 
-void read_and_execute_serial_commandspeed) {
+/* Update the speed of the rover. */
+void update_speed() {
+  speed += speed_change;
+  if (speed > 500)
+    speed = 500;
+  speed_change = 0;
+}
+
+/* Use serial to control rover. */
+void read_and_execute_serial_command() {
   if (Serial1.available()) {
     char val = Serial1.read();
     Serial1.print("Speed:");
@@ -525,100 +474,4 @@ void read_and_execute_serial_commandspeed) {
         break;
     }
   }
-}
-
-
-
-/* Configure motors to their corresponding pins. */
-void enable_motors() {
-  // Attach servo objects to the corresponding pins.
-  front_left_motor.attach(front_left);
-  back_left_motor.attach(back_left);
-  back_right_motor.attach(back_right);
-  front_right_motor.attach(front_right);
-}
-
-/* Detach motors from their pins and pull pin state to
- * low or high depending on whether pull-down/pull-up resistors are used. */
-void disable_motors() {
-  // Detach servo objects from the pins.
-  front_left_motor.detach();
-  front_right_motor.detach();
-  back_left_motor.detach();
-  back_right_motor.detach();
-
-  // Do not allow floating voltages on the pins.
-  pinMode(front_left, INPUT);
-  pinMode(back_left, INPUT);
-  pinMode(back_right, INPUT);
-  pinMode(front_right, INPUT);
-}
-
-/* Move omni-directional wheeled rover foward. */
-void forward() {
-  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
-  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
-  front_left_motor.writeMicroseconds(1500 + speed);
-  front_right_motor.writeMicroseconds(1500 - speed);
-  back_left_motor.writeMicroseconds(1500 + speed);
-  back_right_motor.writeMicroseconds(1500 - speed);
-}
-
-/* Move omni-directional wheeled rover backwards. */
-void reverse() {
-  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
-  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
-  front_left_motor.writeMicroseconds(1500 - speed);
-  front_right_motor.writeMicroseconds(1500 + speed);
-  back_left_motor.writeMicroseconds(1500 - speed);
-  back_right_motor.writeMicroseconds(1500 + speed);
-}
-
-/* Move omni-directional wheeled rover to the left without turning. */
-void strafe_left() {
-  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
-  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
-  front_left_motor.writeMicroseconds(1500 - speed);
-  front_right_motor.writeMicroseconds(1500 - speed);
-  back_left_motor.writeMicroseconds(1500 + speed);
-  back_right_motor.writeMicroseconds(1500 + speed);
-}
-
-/* Move omni-directional wheeled rover to the right without turning. */
-void strafe_right() {
-  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
-  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
-  front_left_motor.writeMicroseconds(1500 + speed);
-  front_right_motor.writeMicroseconds(1500 + speed);
-  back_left_motor.writeMicroseconds(1500 - speed);
-  back_right_motor.writeMicroseconds(1500 - speed);
-}
-
-/* Spin omni-directional wheeled rover counter-clockwise. */
-void ccw() {
-  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
-  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
-  front_left_motor.writeMicroseconds(1500 - speed);
-  front_right_motor.writeMicroseconds(1500 - speed);
-  back_left_motor.writeMicroseconds(1500 - speed);
-  back_right_motor.writeMicroseconds(1500 - speed);
-}
-
-/* Spin omni-directional wheeled rover clockwise. */
-void cw() {
-  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
-  // Logic will not work for rovers with normal wheels, only omni-directional wheels.
-  front_left_motor.writeMicroseconds(1500 + speed);
-  front_right_motor.writeMicroseconds(1500 + speed);
-  back_left_motor.writeMicroseconds(1500 + speed);
-  back_right_motor.writeMicroseconds(1500 + speed);
-}
-
-/* Stop rover wheels. */
-void stop() {
-  // Continuous servo - 1000 is full speed ccw, 1500 is no movement and 2000 is full speed cw.
-  front_left_motor.writeMicroseconds(1500);
-  front_right_motor.writeMicroseconds(1500);
-  back_left_motor.writeMicroseconds(1500);
-  back_right_motor.writeMicroseconds(1500);
 }

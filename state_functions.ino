@@ -19,9 +19,10 @@ STATE test() {
 	enable_motors();
 	enable_servo();
 	// Allow serial control of rover.
-  read_and_execute_serial_command(speed);
+  read_and_execute_serial_command();
 
   /* Add any code/logic here to test it out. */
+
   return TEST;
 }
 
