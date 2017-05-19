@@ -2,7 +2,6 @@
  * Authors: Nitish Lobo & Theo Drissner-Devine
 
 
-
     Note: Finish all TODO's before merging into master.
 */
 #include <Servo.h>
@@ -13,6 +12,7 @@
 // Set maximum distance (mm) at which obstacle is detected.
 #define OB_LIMIT 255
 #define ROBOT_WIDTH 210
+#define TURN_DELAY 1000
 
 // Ultrasonic sensor
 static int sonar[ITERATION_SIZE];
@@ -103,6 +103,7 @@ void loop(void) {
   case CORNER:
     Serial1.println("6");
     machine_state = corner();
+
     direction++;
     total_turn++;
     if(total_turn > 11)
@@ -190,7 +191,6 @@ void update_no_output() {
   heading_angle = Read_MPU();
 }
 
-
 /*----------------------------------------------------------------*/
 // SPIRAL CODE:
 /*----------------------------------------------------------------*/
@@ -217,6 +217,7 @@ void align() {
   stop();
 }
 
+/* Make rover go forward and maintain the alignment with a side wall. */
 void go_forward_and_align() {
   int alignment_gain = 4;
   int* d_side_ir_sensors;
@@ -231,11 +232,14 @@ void go_forward_and_align() {
   front_right_motor.writeMicroseconds(1500 - speed + speed_adj);
 }
 
+/* Sort an array of sensor readings and return median value.
+ * Input args:
+ *    *array = pointer to first index of array of sensor readings.
+ *    size = number of elements in the array.
+ * Return:
+ *    median int value.
+ */
 int get_median_of_array(int* array, int size) {
-  // Sort an array of readings and return the median value.
-  // Key parameters:
-  //  array = array of sensor readings
-  //  size = no. of elements in the array.
   int i, j, a;
   int copy_of_array[5];
 
@@ -254,34 +258,27 @@ int get_median_of_array(int* array, int size) {
         }
       }
   }
-
   // Return median value.
   return copy_of_array[2];
 }
 
-/* Return time (ms) required to turn the robot approx.
-90 degrees according to the current speed setting*/
-int get_turn_delay() {
-  return
-  // TODO: FINISH this function
-  // For speed = 300, use TURN_DELAY = 500; If speed = 150, use 1500.
-  #define TURN_DELAY 1000
-}
-
+/* Get front ir sensor readings from rover.
+ * Input args:
+ *    void
+ * Return:
+ *    Median value of past 5 front ir sensor readings.
+ */
 int* get_front_ir_distances() {
-  // Return a median value of past 5 front ir sensor readings.
   int i;
   static int front_left_ir[ITERATION_SIZE];
   static int front_right_ir[ITERATION_SIZE];
   static int dist[2];
 
-  //Get 5 new readings
+  // Get 5 new readings.
   for (i=0; i<(ITERATION_SIZE-1); i++) {
-      front_left_ir[i] = 136894*(pow(analogRead(A4), (-1.157)));//Left sensor
-      front_right_ir[i] = 102243*(pow(analogRead(A3), (-1.112)));//Right Sensor
+      front_left_ir[i] = 136894*(pow(analogRead(A4), (-1.157)));
+      front_right_ir[i] = 102243*(pow(analogRead(A3), (-1.112)));
   }
-
-
   dist[0] = get_median_of_array(front_left_ir, ITERATION_SIZE);
   dist[1] = get_median_of_array(front_right_ir, ITERATION_SIZE);
 
@@ -296,6 +293,7 @@ int* get_front_ir_distances() {
   return dist;
 }
 
+/* Get distance reading from ultrasonic sensor. */
 int get_sonar_distance() {
     int i, sonar_reading;
     int* d_sonar;
@@ -304,25 +302,23 @@ int get_sonar_distance() {
       d_sonar = ping_location();
       sonar[i] = *(d_sonar+1);
     }
-
     sonar_reading = get_median_of_array(sonar, ITERATION_SIZE);
+
     // Get previous value if reading is 0 or negative distance.
     if (sonar_reading <= 0) {
       return d_front_middle;
     } else {
       return sonar_reading;
     }
-
 }
 
+/* Return average distance from front of rover.*/
 int get_avg_front_distance(){
-  // Return side distance from robot to wall. Average of 2 side sensors.
-  // First index is front sensor, second index is back sensor.
   return ((d_front_left + d_front_right + d_front_middle)/3);
 }
 
+/* Return a median value of past 5 side ir sensor readings. */
 int* get_side_distances() {
-  // Return a median value of past 5 side ir sensor readings.
   int i;
   static int side_front_ir[ITERATION_SIZE];
   static int side_rear_ir[ITERATION_SIZE];
@@ -331,7 +327,6 @@ int* get_side_distances() {
   // Get 5 new readings.
   for (i=0; i<(ITERATION_SIZE-1); i++) {
     //The front sensor gives a different reading to the rear (approx 7mm error).
-    //The rear sensor is compensated
     side_front_ir[i] = 317756*(pow(analogRead(A1),(-1.172)));
     side_rear_ir[i] = (317756*(pow(analogRead(A2),(-1.172))))+7;
   }
@@ -341,8 +336,8 @@ int* get_side_distances() {
   return dist;
 }
 
+/* Return average side distance from robot to wall. */
 int get_avg_side_distance() {
-  // Return side distance from robot to wall. Average of 2 side sensors.
   int* d_side_ir_sensors;
   int d_avg_side;
 
@@ -352,22 +347,22 @@ int get_avg_side_distance() {
   return d_avg_side;
 }
 
+/* Determine whether rover is parallel to a side wall.
+ * Input args:
+ *    void
+ * Return:
+ *    true - sensors are within a reasonable difference of each other.
+ *    false - there is an object present near to front or back of the robot.
+ */
 bool is_rover_parallel_to_wall() {
-  // Return 1 if sensors are within a reasonable difference of each other. Otherwise false.
-  // Return of false means there is an object present near to front or back of robot.
   int* d_side_ir_sensors;
   d_side_ir_sensors = get_side_distances();
 
   // 70 is acceptable difference between sensors.
   if ((abs(*d_side_ir_sensors - *(d_side_ir_sensors+1))) < 70)
     return true;
-
   return false;
 }
-
-/*----------------------------------------------------------------*/
-// DEFAULT FUNCTIONS CODE:
-/*----------------------------------------------------------------*/
 
 /* Blink built in arduino led really fast. */
 void blink_onboard_led_quickly()
@@ -387,6 +382,7 @@ void blink_onboard_led_quickly()
   }
 }
 
+/* Blink built in arduino led slowly. */
 void blink_onboard_led_slowly() {
   static unsigned long slow_flash_millis;
   if (millis() - slow_flash_millis > 2000) {
@@ -401,7 +397,6 @@ bool is_battery_low() {
   // analogRead() returns 635 units for 3.1V
   if (analogRead(A0) < 635)
     return true;
-
   return false;
 }
 
